@@ -47,7 +47,7 @@ export default function Aliens() {
         </ol>
       </section>
 
-      <section aria-labelledby="interviews-heading">
+      <section aria-labelledby="interviews-heading" className="interviews-section">
         <h2 id="interviews-heading" className="section-title">Interviews</h2>
         <div className="filters">
           <label>

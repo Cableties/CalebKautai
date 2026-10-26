@@ -2186,3 +2186,363 @@ a {
     repeating-linear-gradient(to bottom, transparent 0 2px, rgb(0 0 0 / 0.18) 2px 3px),
     radial-gradient(ellipse at center, transparent 55%, rgb(0 0 0 / 0.75) 100%);
 }
+
+/* ---------- Layout: a centred column, with the alignment varied page by page ----------
+   Everything sits in one centred column (--content wide). The header and footer keep their
+   full-width lines but line their contents up with it. Within it: the home page zig-zags,
+   the QR landing pages are centred like a splash screen, and Aliens goes side by side. */
+:root {
+  --content: 1200px;
+}
+.section,
+.page,
+.hero {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: calc(var(--content) + 2 * var(--gutter));
+  margin-inline: auto;
+}
+.site-header,
+.site-footer {
+  padding-inline: max(var(--gutter), calc((100% - var(--content)) / 2));
+}
+
+/* Home: the name holds the left; the intro and buttons answer from the right */
+@media (min-width: 900px) {
+  .hero-intro {
+    margin-left: auto;
+    text-align: right;
+  }
+  .hero-actions {
+    justify-content: flex-end;
+  }
+  #things .section-title {
+    text-align: center;
+  }
+  /* Masters of Alchemy: the picture leads from the left */
+  .alchemy {
+    grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  }
+  .alchemy > img {
+    order: -1;
+  }
+}
+/* The testimonial as a centred pull quote */
+.quote {
+  position: relative;
+  max-width: 920px;
+  margin-inline: auto;
+  text-align: center;
+}
+.quote::before {
+  content: '“';
+  display: block;
+  height: 0.55em;
+  font: 800 clamp(6rem, 14vw, 10rem) / 1 var(--display);
+  color: var(--pink);
+}
+.quote figcaption::before {
+  content: '— ';
+}
+
+/* QR landing pages (tattoo and good friend), and the small pages: centred */
+.tattoo,
+.page:has(> .friend-gif),
+.tracker,
+.cheats,
+.page:has(> .page-title + .lede + .button) {
+  text-align: center;
+}
+:is(.tattoo, .page:has(> .friend-gif), .tracker, .cheats, .page:has(> .page-title + .lede + .button)) :is(.page-title, .lede) {
+  margin-inline: auto;
+}
+.tattoo .tattoo-face,
+.friend-gif,
+.tracker .map {
+  margin-inline: auto;
+}
+.tattoo .choices {
+  justify-content: center;
+}
+.tattoo .choice {
+  justify-content: center;
+}
+.page:has(> .friend-gif) .socials,
+.tracker .coords {
+  justify-content: center;
+}
+.tracker .tracker-status {
+  justify-content: center;
+}
+/* Reviews and the cheat list read best left-aligned, as a centred block */
+.tattoo .reviews,
+.cheats .cheat-list {
+  margin-inline: auto;
+  text-align: left;
+}
+.tattoo .reviews-summary {
+  justify-content: flex-start;
+}
+
+/* Aliens: the tally sits beside the interviews on wide screens, and stays in view */
+@media (min-width: 1100px) {
+  .aliens {
+    display: grid;
+    grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+    column-gap: 56px;
+  }
+  .aliens > * {
+    grid-column: 1 / -1;
+  }
+  .aliens > .tally {
+    grid-column: 1;
+    align-self: start;
+    position: sticky;
+    top: 24px;
+  }
+  .aliens > .interviews-section {
+    grid-column: 2;
+  }
+}
+
+/* ---------- Good friend quiz (FriendQuiz.jsx) ---------- */
+.quiz {
+  max-width: 560px;
+  margin: 40px auto;
+  padding: clamp(20px, 5vw, 32px);
+  text-align: center;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+.page section.quiz {
+  margin-top: 40px;
+}
+.quiz-progress {
+  height: 8px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 999px;
+}
+.quiz-progress span {
+  display: block;
+  height: 100%;
+  background: var(--pink-ink);
+  border-radius: inherit;
+  transition: width 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.quiz-count {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+}
+.quiz-question {
+  margin: 0 0 20px;
+  font-size: clamp(1.5rem, 4.5vw, 2rem);
+  font-weight: 800;
+}
+.quiz-options {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.quiz-options button {
+  width: 100%;
+  min-height: 52px;
+  padding: 12px 18px;
+  font: 600 1.05rem/1.3 var(--body);
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s ease;
+}
+.quiz-options button:hover:not(:disabled) {
+  border-color: var(--pink-ink);
+}
+.quiz-options button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+.quiz-options button.right {
+  opacity: 1;
+  background: color-mix(in srgb, var(--mint) var(--card-mix), var(--paper));
+  border-color: color-mix(in srgb, var(--mint) 60%, var(--ink));
+}
+.quiz-options button.wrong {
+  opacity: 1;
+  background: color-mix(in srgb, var(--pink) var(--card-mix), var(--paper));
+  border-color: var(--pink-ink);
+}
+.quiz-result {
+  margin-top: 20px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--paper);
+  animation: rise 0.25s ease-out both;
+}
+.quiz-result p {
+  margin: 0 0 14px;
+}
+.quiz-result.right strong {
+  color: color-mix(in srgb, var(--mint) 35%, var(--ink));
+}
+.quiz-result.wrong strong {
+  color: var(--pink-ink);
+}
+.quiz-loading {
+  color: var(--ink-soft);
+}
+.quiz-score {
+  margin: 0;
+  font: 800 clamp(3rem, 12vw, 5rem) / 1 var(--display);
+  color: var(--pink-ink);
+}
+.quiz-done .section-title {
+  margin-top: 8px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .quiz-options button:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+}
+
+/* Knots and crosses */
+.ttt {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: min(300px, 100%);
+  margin: 0 auto;
+}
+.ttt-cell {
+  aspect-ratio: 1;
+  font: 800 clamp(2rem, 9vw, 2.8rem) / 1 var(--display);
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.ttt-cell:disabled {
+  cursor: default;
+}
+.ttt-cell:hover:not(:disabled) {
+  border-color: var(--pink-ink);
+}
+.ttt-line {
+  background: color-mix(in srgb, var(--yellow) 70%, var(--paper));
+}
+
+/* The map question */
+.quiz-map-box {
+  height: clamp(280px, 60vw, 380px);
+  margin-bottom: 14px;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid var(--line);
+}
+.quiz-pin-wrap {
+  background: none;
+  border: 0;
+}
+.quiz-pin {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 3px 8px rgb(0 0 0 / 0.4);
+}
+.quiz-pin.guess {
+  background: #c23d82;
+  cursor: grab;
+}
+.quiz-pin.answer {
+  background: #2a8a5f;
+}
+
+/* The draw-me question */
+.draw {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+.draw-canvas {
+  width: min(360px, 100%);
+  aspect-ratio: 1;
+  background: #fff;
+  border: 2px solid var(--line);
+  border-radius: 12px;
+  cursor: crosshair;
+  touch-action: none; /* drawing, not scrolling */
+}
+.draw-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 16px;
+}
+.draw-inks,
+.draw-brushes,
+.draw-actions {
+  display: flex;
+  gap: 6px;
+}
+.draw-ink {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: var(--ink-colour);
+  border: 3px solid var(--paper);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+.draw-ink[aria-checked='true'] {
+  box-shadow: 0 0 0 3px var(--pink-ink);
+}
+.draw-brushes button,
+.draw-actions button {
+  min-height: 34px;
+  padding: 0 12px;
+  font: 600 0.85rem/1 var(--body);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.draw-brushes button[aria-checked='true'] {
+  color: var(--paper);
+  background: var(--ink);
+}
+.draw-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.draw-reveal {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.draw-reveal figure {
+  margin: 0;
+}
+.draw-reveal img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  object-position: 50% 20%; /* keep the face in the square crop */
+  background: #fff;
+  border-radius: 12px;
+}
+.draw-reveal figcaption {
+  margin-top: 6px;
+  font-weight: 700;
+}

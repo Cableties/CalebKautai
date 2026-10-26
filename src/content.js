@@ -8,11 +8,12 @@ export const USE_LOCAL_IMAGES = true;
 // width/height are the WebP's size, so the browser can reserve space before it loads.
 const WIX = "https://static.wixstatic.com/media/";
 export const images = {
+	// Head-on-a-plate at Illusions Sydney (replaced the old Wix avatar, so no Wix copy)
 	avatar: {
 		file: "avatar.png",
-		width: 1600,
-		height: 1600,
-		remote: WIX + "a935b6_f410eaef65ae47a3adad09be75b69fa2~mv2.png",
+		width: 1371,
+		height: 1398,
+		remote: "/images/avatar.webp",
 	},
 	tattooGif: {
 		file: "caleb-square.gif",
@@ -314,6 +315,100 @@ export const projects = [
 ];
 
 export const githubProfile = "https://github.com/Cableties";
+
+// Good friend page: "How good a friend are you really?" (components/FriendQuiz.jsx).
+// Question types:
+//   choice    — `answer` plus wrong `options`, shuffled
+//   tictactoe — beat the computer
+//   map       — drag a pin onto `place`; within `withinKm` counts; `view` is the starting area
+//   draw      — draw me; any attempt scores, and it's shown next to the real `image`
+// `after` is the line shown once they've answered (for draw, one of `verdicts` at random).
+export const friendQuiz = [
+	{
+		type: "choice",
+		question: "What year was I born?",
+		answer: "2001",
+		options: ["1999", "2000", "2002"],
+		after: "2001. A vintage year.",
+	},
+	{
+		type: "choice",
+		question: "How did I break my ankle?",
+		answer: "Freak rollerskating accident",
+		options: [
+			"Fighting a kangaroo",
+			"Tripped over a D&D dice",
+			"Dancing too hard at a wedding",
+		],
+		after: "Rollerskates: 1, Caleb: 0.",
+	},
+	{
+		type: "choice",
+		question: "What's my middle name?",
+		answer: "Teura",
+		options: ["Teina", "Benjamin", "Taika"],
+		after: "Teura. Not Taika, sadly.",
+	},
+	{
+		type: "choice",
+		question: "Is it a parma or a parmy?",
+		answer: "Parma",
+		options: ["Parmy"],
+		after: "It's a parma. This is not up for debate.",
+	},
+	{
+		type: "choice",
+		question: "Who's my favourite Pokémon?",
+		answer: "Turtwig",
+		options: ["Chimchar", "Piplup", "Pikachu"],
+		after: "Turtwig. A tree on a turtle. Perfect.",
+	},
+	{
+		type: "choice",
+		question: "Where did I get my degree?",
+		answer: "Deakin Uni",
+		options: ["Monash", "RMIT", "Uni of Melbourne"],
+		after: "Deakin, IT with a focus on app development.",
+	},
+	{
+		type: "tictactoe",
+		question: "Win at knots and crosses",
+		after: "Friendship requires sacrifice. Mostly mine.",
+	},
+	{
+		type: "map",
+		question: "Drop the pin on the city I was born in",
+		place: { name: "Mt Isa", lat: -20.7256, lng: 139.4927 },
+		withinKm: 200,
+		// What the map shows to start with: Australia
+		view: [
+			[-43.7, 113],
+			[-10.5, 153.7],
+		],
+		after: "Mount Isa, Queensland. Outback born.",
+	},
+	{
+		type: "draw",
+		question: "Finally: draw me",
+		image: "workPhoto",
+		verdicts: [
+			"Uncanny. Are you a professional?",
+			"Honestly better than my passport photo.",
+			"My mum is going to frame this.",
+			"I've never felt so seen.",
+			"Gallery-worthy. Possibly a crime.",
+		],
+	},
+];
+
+// Quiz ranks, from the lowest score up: shown if they got at least `min` of the questions right
+export const friendRanks = [
+	{ min: 0, title: "Have we met?", text: "I'm going to pretend this didn't happen." },
+	{ min: 0.4, title: "Acquaintance", text: "We've definitely nodded at each other once." },
+	{ min: 0.6, title: "Mate", text: "Solid. You can come to the barbecue." },
+	{ min: 0.8, title: "Good friend", text: "You know me better than my bank does." },
+	{ min: 1, title: "Certified bestie", text: "Perfect score. Frankly, a little concerning." },
+];
 
 // Reviews left on the old Wix tattoo page (all 5 stars), shown under the new ones and counted in
 // the average. Emails left out.

@@ -33,6 +33,10 @@ export const test = base.extend({
       await page.route('https://www.google.com/maps**', (route) =>
         route.fulfill({ contentType: 'text/html', body: '<!doctype html><title>map</title>' }),
       )
+      // Map tiles for the quiz: a blank tile, so tests don't load OpenStreetMap
+      await page.route('https://*.tile.openstreetmap.org/**', (route) =>
+        route.fulfill({ contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64') }),
+      )
       // Vercel serves its analytics script only on deployments
       await page.route('**/_vercel/**', (route) => route.fulfill({ contentType: 'text/javascript', body: '' }))
       await use(api)

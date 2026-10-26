@@ -7,7 +7,7 @@ export default defineConfig({
   fullyParallel: true,
   // Headless WebKit stops producing frames when too many browsers share the CPU, which makes
   // clicks time out waiting for elements to settle
-  workers: process.env.CI ? 2 : 3,
+  workers: 2,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',

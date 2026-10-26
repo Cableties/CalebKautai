@@ -1,5 +1,6 @@
 import BouncingHead from '../components/BouncingHead.jsx'
 import { useCheats } from '../components/Cheats.jsx'
+import FriendQuiz from '../components/FriendQuiz.jsx'
 import { img, socials } from '../content.js'
 
 export default function GoodFriend() {
@@ -12,6 +13,7 @@ export default function GoodFriend() {
       <h1 className="page-title">Hey buddy!</h1>
       <p className="lede">It's me! Caleb! Your best friend… right?</p>
       <img className="friend-gif" {...img('tattooGif')} alt="Caleb waving" />
+      <FriendQuiz />
       <p>It's good to see you! Wanna check out my YouTube channel?</p>
       <ul className="socials">
         {socials.map((s) => (
