@@ -40,3 +40,20 @@ test('every interview links to an audio file that exists', async ({ page, reques
     expect(res.status(), audio).toBe(200)
   }
 })
+
+test('the tattoo hack covers the player bar', async ({ page }) => {
+  await page.goto('/aliens')
+  await page.getByRole('button', { name: "Play Mika's interview" }).click()
+  const player = page.getByRole('region', { name: 'Podcast player' })
+  await expect(player).toBeVisible()
+
+  await openNav(page)
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Tattoo' }).click()
+  await expect(page.getByRole('dialog', { name: /hacking in progress/i })).toBeVisible()
+  const box = await player.boundingBox()
+  const topmost = await page.evaluate(
+    ([x, y]) => document.elementFromPoint(x, y)?.closest('.hack, .player')?.className,
+    [box.x + box.width / 2, box.y + box.height / 2],
+  )
+  expect(topmost).toContain('hack')
+})

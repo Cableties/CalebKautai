@@ -10,6 +10,20 @@ export default function Layout() {
   const { pathname } = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
 
+  // Card spotlight: tell the hovered card where the cursor is (styles.css draws the glow)
+  useEffect(() => {
+    function track(e) {
+      if (e.pointerType !== 'mouse') return
+      const card = e.target.closest?.('.card, .project')
+      if (!card) return
+      const box = card.getBoundingClientRect()
+      card.style.setProperty('--mx', `${e.clientX - box.left}px`)
+      card.style.setProperty('--my', `${e.clientY - box.top}px`)
+    }
+    document.addEventListener('pointermove', track, { passive: true })
+    return () => document.removeEventListener('pointermove', track)
+  }, [])
+
   useEffect(() => {
     window.scrollTo(0, 0)
     setMenuOpen(false)
