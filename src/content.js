@@ -20,6 +20,13 @@ export const images = {
 		height: 560,
 		remote: WIX + "a935b6_95664e7ee0474c62b7882dc9593c077f~mv2.gif",
 	},
+	// Spinning face on the tattoo page (transparent background). Never on Wix, so no remote.
+	face: {
+		file: "caleb-face.gif",
+		width: 524,
+		height: 574,
+		remote: "/images/caleb-face.webp",
+	},
 	workPhoto: {
 		file: "work-photo.jpg",
 		width: 600,

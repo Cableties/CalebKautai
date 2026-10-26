@@ -608,9 +608,9 @@ html.no-scroll {
   overflow: hidden;
 }
 
-/* The intro runs entirely on this CSS timeline (so it clears itself even without JS):
-   0.25–2.5s log lines type in · 2.9–4.2s download bar · 4.3s ACCESS GRANTED + shake · 5.15s fade out.
-   Nothing flashes faster than ~1/s. */
+/* The intro runs on this CSS timeline, then waits for the visitor to tap Continue:
+   0.25–2.5s log lines type in · 2.9–4.2s download bar · 4.3s ACCESS GRANTED + shake ·
+   4.6s victim number · 5s Continue. Nothing flashes faster than ~1/s. */
 .hack {
   --hack-bg: #0d0c16;
   --hack-text: #bfe8d6;
@@ -628,7 +628,10 @@ html.no-scroll {
   color: var(--hack-text);
   font: 500 clamp(0.95rem, 3.8vw, 1.15rem) / 1.5 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   overflow: hidden;
-  animation: hack-out 0.45s 5.15s ease-in forwards;
+}
+/* Leaves only when the visitor taps Continue or Skip */
+.hack.leaving {
+  animation: hack-out 0.45s ease-in forwards;
 }
 /* CRT scanlines over the whole intro */
 .hack::after {
@@ -728,8 +731,51 @@ html.no-scroll {
   position: relative;
   z-index: 1;
 }
+.hack-continue {
+  align-self: center;
+  min-height: 52px;
+  padding: 0 32px;
+  font: 700 1.05rem/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color: var(--hack-bg);
+  background: var(--hack-text);
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+  animation: rise 0.3s ease-out both;
+}
+.hack-continue:hover,
+.hack-continue:focus-visible {
+  background: var(--hack-pink);
+}
+.hack-continue:focus-visible {
+  outline: 3px solid var(--hack-blue);
+  outline-offset: 3px;
+}
+/* Reduced motion: the same screen, all at once and still */
 @media (prefers-reduced-motion: reduce) {
-  .hack {
+  .hack *,
+  .hack *::before,
+  .hack *::after {
+    animation: none !important;
+  }
+  .hack-log li {
+    clip-path: none;
+  }
+  .hack-progress,
+  .hack-granted,
+  .hack-victim {
+    opacity: 1;
+  }
+  .hack-progress {
+    --pct: 100;
+  }
+  .hack-bar span {
+    transform: none;
+  }
+  .hack-granted::before,
+  .hack-granted::after {
     display: none;
   }
 }
@@ -806,22 +852,138 @@ html.no-scroll {
 .glitch::after {
   color: var(--blue-ink);
 }
-.tattoo-gif {
+/* The spinning head as a hologram. Everything is cut to the head's outline: the glow follows its
+   transparency, and the scanlines use the image itself as a mask. */
+.tattoo-face {
+  width: min(260px, 64vw);
+  margin: 0 0 24px;
+}
+.holo {
+  --holo: #1f9fd0;
+  --holo-glow: rgb(31 159 208 / 0.55);
+  /* The projector disc: the beam starts from its centre */
+  --disc-height: 22px;
+  --disc-bottom: 4px;
   position: relative;
-  width: min(280px, 70vw);
-  margin: 8px 0 28px;
-  border-radius: 6px;
-  overflow: hidden;
+  padding-bottom: 34px; /* room for the projector */
 }
-.tattoo-gif img {
+:root[data-theme='dark'] .holo {
+  --holo: #7fe7ff;
+  --holo-glow: rgb(127 231 255 / 0.6);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .holo {
+    --holo: #7fe7ff;
+    --holo-glow: rgb(127 231 255 / 0.6);
+  }
+}
+.holo-stack {
+  position: relative;
+  filter: drop-shadow(0 0 10px var(--holo-glow));
+}
+.holo-img {
+  display: block;
   width: 100%;
+  filter: grayscale(1) sepia(1) saturate(3.5) hue-rotate(150deg) brightness(1.35) contrast(0.95);
+  opacity: 0.85;
 }
-.tattoo-gif::after {
-  content: '';
+/* Colour fringes: the same image, tinted and nudged sideways */
+.holo-fringe {
+  position: absolute;
+  inset: 0;
+  background: var(--holo-src) center / contain no-repeat;
+  opacity: 0.35;
+  pointer-events: none;
+}
+.holo-fringe-pink {
+  filter: grayscale(1) sepia(1) saturate(5) hue-rotate(290deg);
+  transform: translateX(-3px);
+}
+.holo-fringe-blue {
+  filter: grayscale(1) sepia(1) saturate(5) hue-rotate(180deg);
+  transform: translateX(3px);
+}
+/* Scanlines plus a bright band sweeping down, only where the head is */
+.holo-lines {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(to bottom, transparent 0 3px, rgb(0 0 0 / 0.12) 3px 4px);
+  background:
+    linear-gradient(to bottom, transparent 0 40%, rgb(255 255 255 / 0.45) 50%, transparent 60% 100%) 0 0 / 100% 300% no-repeat,
+    repeating-linear-gradient(to bottom, transparent 0 2px, color-mix(in srgb, var(--holo) 55%, transparent) 2px 3px);
+  -webkit-mask: var(--holo-src) center / contain no-repeat;
+  mask: var(--holo-src) center / contain no-repeat;
+  mix-blend-mode: overlay;
+}
+/* Projector: a glowing disc under the head, and a faint beam rising from it */
+.holo::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: calc(var(--disc-bottom) + var(--disc-height) / 2);
+  height: 70%;
+  background: linear-gradient(to top, color-mix(in srgb, var(--holo) 28%, transparent), transparent);
+  clip-path: polygon(30% 100%, 70% 100%, 100% 0, 0 0);
+  pointer-events: none;
+}
+.holo::after {
+  content: '';
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: var(--disc-bottom);
+  height: var(--disc-height);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--holo), color-mix(in srgb, var(--holo) 35%, transparent) 60%, transparent);
+  box-shadow: 0 0 24px var(--holo-glow);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .holo-stack {
+    animation: holo-float 4s ease-in-out infinite, holo-flicker 5s steps(1) infinite;
+  }
+  .holo-lines {
+    animation: holo-sweep 3.2s linear infinite;
+  }
+  .holo-fringe-pink {
+    animation: holo-jitter-pink 3.7s steps(1) infinite;
+  }
+  .holo-fringe-blue {
+    animation: holo-jitter-blue 3.7s steps(1) infinite;
+  }
+}
+@keyframes holo-float {
+  50% {
+    transform: translateY(-8px);
+  }
+}
+/* Two small dips every 5s: a flicker, not a flash */
+@keyframes holo-flicker {
+  0%, 100% { opacity: 1; }
+  41% { opacity: 0.75; }
+  43% { opacity: 1; }
+  87% { opacity: 0.8; }
+  88% { opacity: 1; }
+}
+@keyframes holo-sweep {
+  from { background-position: 0 100%, 0 0; }
+  to { background-position: 0 -50%, 0 0; }
+}
+@keyframes holo-jitter-pink {
+  0%, 100% { transform: translateX(-3px); }
+  62% { transform: translateX(-9px); }
+  65% { transform: translateX(-3px); }
+}
+@keyframes holo-jitter-blue {
+  0%, 100% { transform: translateX(3px); }
+  62% { transform: translateX(8px); }
+  65% { transform: translateX(3px); }
+}
+/* Good friend page: the waving GIF that used to be on the tattoo page */
+.friend-gif {
+  width: min(280px, 70vw);
+  margin: 4px 0 24px;
+  border-radius: 14px;
 }
 .choice-prompt {
   font-size: 1.3rem;
@@ -883,13 +1045,13 @@ html.no-scroll {
   .tattoo-in .glitch::after {
     animation: glitch-burst 0.7s steps(5) reverse both, glitch-idle 4s 1.6s steps(4) infinite;
   }
-  .tattoo-in .tattoo-gif,
+  .tattoo-in .tattoo-face,
   .tattoo-in .lede,
   .tattoo-in .choice-prompt,
   .tattoo-in .choices li {
     animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
-  .tattoo-in .tattoo-gif { animation-delay: 0.15s; }
+  .tattoo-in .tattoo-face { animation-delay: 0.15s; }
   .tattoo-in .lede { animation-delay: 0.3s; }
   .tattoo-in .choice-prompt { animation-delay: 0.45s; }
   .tattoo-in .choices li { animation-delay: calc(0.6s + var(--i) * 0.12s); }

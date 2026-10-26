@@ -70,5 +70,12 @@ export async function openNav(page) {
   }).toPass()
 }
 
+// Open the tattoo page and skip the hack cutscene (it plays on every visit)
+export async function openTattoo(page) {
+  await page.goto('/tattoo')
+  await page.getByRole('button', { name: 'Skip hack' }).click()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+}
+
 // Tap the nth star (1–5) in the review form, the way a visitor would
 export const tapStar = (page, n) => page.locator('.star-input label').nth(n - 1).click()

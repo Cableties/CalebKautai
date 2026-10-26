@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Reviews from '../components/Reviews.jsx'
 import { img } from '../content.js'
@@ -9,11 +9,11 @@ const choices = [
   { to: '/tattoo-love-interest', label: 'Love interest' },
 ]
 
-// The fake "hack" plays once per visit; coming back from a choice page skips it.
-const SEEN_KEY = 'tattoo-hack-seen'
-// Each browser session counts as one scan (the API also limits repeats per visitor).
+// Each browser session counts as one scan (the API also limits repeats per visitor),
+// though the hack itself plays on every visit to the page.
 const COUNTED_KEY = 'tattoo-scan-counted'
-const INTRO_MS = 5600
+// When the CSS timeline finishes (just after the victim number appears) and Continue shows up
+const INTRO_MS = 5000
 
 function useScanCount() {
   const [count, setCount] = useState(null)
@@ -51,49 +51,65 @@ function readDevice() {
   return { device, screen: `${screen.width}×${screen.height}`, time }
 }
 
+// The spinning head as a hologram: a tinted image, two colour-fringe copies, and scanlines cut to
+// the head's shape (the image's own transparency is the mask), floating over a projector.
+function Hologram({ src, width, height, alt }) {
+  return (
+    <div className="tattoo-face holo" style={{ '--holo-src': `url(${src})` }}>
+      <div className="holo-stack">
+        <img className="holo-img" src={src} width={width} height={height} alt={alt} />
+        <span className="holo-fringe holo-fringe-pink" aria-hidden="true" />
+        <span className="holo-fringe holo-fringe-blue" aria-hidden="true" />
+        <span className="holo-lines" aria-hidden="true" />
+      </div>
+    </div>
+  )
+}
+
 export default function Tattoo() {
-  // The intro is in the prerendered HTML (its CSS timeline clears it even without JS);
-  // after mount, JS fills in the device details, handles Skip, and remembers it was seen.
-  const [intro, setIntro] = useState(true)
+  // The hack plays on every visit and waits for the visitor: playing → done (Continue shows)
+  // → leaving (exit animation) → gone. It's in the prerendered HTML; JS fills in the device
+  // details and handles the buttons. With reduced motion it's a still screen, already done.
+  const [stage, setStage] = useState('playing')
   const [info, setInfo] = useState(null)
   const [battery, setBattery] = useState(null)
+  const reducedMotion = useRef(false)
+  const continueButton = useRef(null)
   const scans = useScanCount()
 
   useLayoutEffect(() => {
-    let seen = false
-    try {
-      seen = sessionStorage.getItem(SEEN_KEY) === '1'
-    } catch {
-      // Storage blocked: just play it
-    }
-    if (seen || matchMedia('(prefers-reduced-motion: reduce)').matches) setIntro(false)
+    reducedMotion.current = matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (reducedMotion.current) setStage('done')
+    setInfo(readDevice())
+    navigator.getBattery?.().then((b) => setBattery(Math.round(b.level * 100)), () => {})
   }, [])
 
   useEffect(() => {
-    if (!intro) return
-    setInfo(readDevice())
-    navigator.getBattery?.().then((b) => setBattery(Math.round(b.level * 100)), () => {})
-    document.documentElement.classList.add('no-scroll')
-    const id = setTimeout(finish, INTRO_MS)
-    return () => {
-      clearTimeout(id)
-      document.documentElement.classList.remove('no-scroll')
-    }
-  }, [intro])
+    if (stage !== 'playing') return
+    const id = setTimeout(() => setStage('done'), INTRO_MS)
+    return () => clearTimeout(id)
+  }, [stage])
 
-  function finish() {
-    try {
-      sessionStorage.setItem(SEEN_KEY, '1')
-    } catch {
-      // Storage blocked: it'll replay next time, which is fine
-    }
-    setIntro(false)
-  }
+  useEffect(() => {
+    if (stage === 'done') continueButton.current?.focus()
+    // No scrolling the page underneath while the hack is on screen
+    document.documentElement.classList.toggle('no-scroll', stage !== 'gone')
+    return () => document.documentElement.classList.remove('no-scroll')
+  }, [stage])
+
+  const finish = () => setStage(reducedMotion.current ? 'gone' : 'leaving')
+  const intro = stage !== 'gone'
 
   return (
     <>
       {intro && (
-        <div className="hack" role="dialog" aria-modal="true" aria-label="Totally real hacking in progress">
+        <div
+          className={'hack' + (stage === 'leaving' ? ' leaving' : '')}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Totally real hacking in progress"
+          onAnimationEnd={(e) => e.animationName === 'hack-out' && setStage('gone')}
+        >
           <div className="hack-screen">
             <p className="hack-alert">⚠ Intrusion in progress</p>
             <ol className="hack-log">
@@ -118,9 +134,15 @@ export default function Tattoo() {
             </p>
             {scans !== null && <p className="hack-victim">You are victim #{scans.toLocaleString()}</p>}
           </div>
-          <button type="button" className="hack-skip" onClick={finish}>
-            Skip hack →
-          </button>
+          {stage === 'playing' ? (
+            <button type="button" className="hack-skip" onClick={finish}>
+              Skip hack →
+            </button>
+          ) : (
+            <button type="button" className="hack-continue" ref={continueButton} onClick={finish}>
+              Continue →
+            </button>
+          )}
         </div>
       )}
 
@@ -128,9 +150,7 @@ export default function Tattoo() {
         <h1 className="page-title glitch" data-text="Woah, you actually scanned it!">
           Woah, you actually scanned it!
         </h1>
-        <div className="tattoo-gif">
-          <img {...img('tattooGif')} alt="Caleb waving" />
-        </div>
+        <Hologram {...img('face')} alt="Caleb's head, spinning, as a hologram" />
         <p className="lede">
           That's so amazing! While I steal your bank information, why not stick around and check out some stuff?
         </p>

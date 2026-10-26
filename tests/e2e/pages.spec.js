@@ -2,11 +2,7 @@ import { notFoundMeta, pageMeta } from '../../src/content.js'
 import { metaFor, pageTitle } from '../../src/meta.js'
 import { expect, openNav, test } from './fixtures.js'
 
-// The tattoo page opens with the fake hack; skip it here, it has its own tests.
-async function visit(page, path) {
-  await page.addInitScript(() => sessionStorage.setItem('tattoo-hack-seen', '1'))
-  await page.goto(path)
-}
+const visit = (page, path) => page.goto(path)
 
 for (const path of Object.keys(pageMeta)) {
   test(`${path} loads with its title and heading, and fits the screen`, async ({ page }) => {

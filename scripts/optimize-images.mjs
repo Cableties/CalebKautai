@@ -8,6 +8,10 @@ const src = fileURLToPath(new URL('../images-src/', import.meta.url))
 const dir = fileURLToPath(new URL('../public/images/', import.meta.url))
 await mkdir(dir, { recursive: true })
 
+// Per-image WebP quality where the default (80) makes a heavy file. The spinning face is 140
+// frames; at the size it's shown, 50 looks the same and is 1.4 MB instead of 2.4 MB.
+const QUALITY = { 'caleb-face.gif': 50 }
+
 for (const name of await readdir(src)) {
   if (!/\.(jpe?g|png|gif)$/i.test(name)) continue
   const out = name.replace(/\.\w+$/, '.webp')
@@ -15,7 +19,7 @@ for (const name of await readdir(src)) {
   const gif = name.endsWith('.gif')
   const info = await sharp(src + name, { animated: gif })
     .resize({ width: gif ? 560 : 1600, withoutEnlargement: true })
-    .webp({ quality: 80 })
+    .webp({ quality: QUALITY[name] ?? 80, effort: name in QUALITY ? 6 : 4 })
     .toFile(dir + out)
   // For animations, info.height is every frame stacked; the file itself reports one frame
   const { height } = gif ? await sharp(dir + out).metadata() : info
