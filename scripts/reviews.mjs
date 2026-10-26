@@ -3,13 +3,17 @@
 //   npm run reviews -- approve <id> publish one (or `approve all`)
 //   npm run reviews -- delete <id>  remove a pending or published review, and its rating
 //   npm run reviews -- published    list published reviews
-// Needs the database credentials: run `vercel env pull .env.local` once first.
+// Needs the database's REST URL and token in .env.moderation (git-ignored):
+//   UPSTASH_REDIS_REST_URL=https://...upstash.io
+//   UPSTASH_REDIS_REST_TOKEN=...
+// They're marked Sensitive on Vercel, so `vercel env pull` can't fetch them; copy them from the
+// database's page in the Upstash console. A separate file so `vercel env pull` never overwrites it.
 import { existsSync } from 'node:fs'
 
-if (existsSync('.env.local')) process.loadEnvFile('.env.local')
-const { KEYS, redis } = await import('../api/_lib/store.js')
+if (existsSync('.env.moderation')) process.loadEnvFile('.env.moderation')
+const { KEYS, redis } = await import('../api/_lib/store.js').catch(() => ({}))
 if (!redis) {
-  console.error('No database credentials. Run `vercel env pull .env.local` first.')
+  console.error('No database credentials: add the REST URL and token to .env.moderation (see the top of this script).')
   process.exit(1)
 }
 

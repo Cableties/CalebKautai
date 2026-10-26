@@ -36,10 +36,16 @@ Original recordings go in `audio-src/`. `npm run compress-audio` turns them into
 
 The tattoo page's scan counter and star reviews run on two small Vercel functions in `api/`, storing data in Upstash Redis. To connect the database (once), run `vercel integration add upstash` in a terminal, create a free Redis database, and connect it to the `caleb-kautai` project. Vercel adds the credentials as environment variables; redeploy afterwards. Until then the site works without them: the counter and review form stay hidden, and the old Wix comments still show.
 
-Star ratings count straight away. Written comments wait for approval:
+Star ratings count straight away. Written comments wait for approval. The moderation script needs the database's REST URL and token in a git-ignored `.env.moderation` file (copy them from the database's page in the Upstash console; Vercel hides them):
+
+```
+UPSTASH_REDIS_REST_URL=https://...upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
+```
+
+Then:
 
 ```bash
-vercel env pull .env.local         # once, to get the database credentials locally
 npm run reviews                    # list comments waiting for approval
 npm run reviews -- approve <id>    # publish one (or: approve all)
 npm run reviews -- delete <id>     # remove a review and its rating
