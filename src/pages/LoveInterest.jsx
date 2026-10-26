@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Taken from '../components/Taken.jsx'
 import { contact, img } from '../content.js'
 
 const fields = [
@@ -43,6 +44,7 @@ export default function LoveInterest() {
 
   return (
     <article className="page love">
+      <Taken />
       <p className="selected">Ooh la la! You have selected: “love interest”</p>
       <h1 className="page-title">Hey! My name's Caleb Kautai!</h1>
       <p className="lede">I'm a software engineer living in Brisbane, Australia.</p>

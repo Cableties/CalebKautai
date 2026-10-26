@@ -64,6 +64,11 @@ export const images = {
 		height: 879,
 		remote: WIX + "a935b6_e3356326cb29493cb9707d0db24f26b6~mv2.jpg",
 	},
+	// Love interest popup photos: the whole photos at 1000px on the long side, no location data
+	taken1: { file: "taken-1.jpg", width: 1000, height: 750, remote: "/images/taken-1.webp" },
+	taken2: { file: "taken-2.jpg", width: 750, height: 1000, remote: "/images/taken-2.webp" },
+	taken3: { file: "taken-3.jpg", width: 1000, height: 750, remote: "/images/taken-3.webp" },
+	taken4: { file: "taken-4.jpg", width: 750, height: 1000, remote: "/images/taken-4.webp" },
 	loading: {
 		file: "loading.gif",
 		width: 200,
@@ -325,6 +330,12 @@ export const projects = [
 ];
 
 export const githubProfile = "https://github.com/Cableties";
+
+// Love interest page: the "I'm taken" popup (components/Taken.jsx). `photos` are keys from
+// `images` above, shown as taped-up prints; with none, the message leaves out "(see photos below)".
+export const relationship = {
+	photos: ["taken1", "taken2", "taken3", "taken4"],
+};
 
 // Good friend page: "How good a friend are you really?" (components/FriendQuiz.jsx).
 // Question types:

@@ -46,6 +46,7 @@ test('the theme toggle switches to dark mode and remembers it', async ({ page })
 
 test('the love-interest application sends', async ({ page }) => {
   await visit(page, '/tattoo-love-interest')
+  await page.getByRole('button', { name: 'Show me the perks anyway' }).click()
   await page.getByLabel('First name').fill('Testy')
   await page.getByRole('button', { name: 'Submit application' }).click()
   await expect(page.getByText('Application received')).toBeVisible()
