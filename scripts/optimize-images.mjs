@@ -14,6 +14,8 @@ const QUALITY = { 'caleb-face.gif': 50 }
 
 for (const name of await readdir(src)) {
   if (!/\.(jpe?g|png|gif)$/i.test(name)) continue
+  // The bouncing head's poses become a pixel-art sprite sheet instead (scripts/pixel-sprites.mjs)
+  if (name.startsWith('bounce-')) continue
   const out = name.replace(/\.\w+$/, '.webp')
   // GIFs stay animated, and are only ever shown small
   const gif = name.endsWith('.gif')

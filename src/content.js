@@ -108,6 +108,7 @@ export const nav = [
 	{ to: "/tattoo", label: "Tattoo" },
 	{ to: "/aliens", label: "Aliens!" },
 	{ to: "/find-me", label: "Find me" },
+	{ to: "/cheat-codes", label: "Cheat codes" },
 ];
 
 export const intro =
@@ -187,6 +188,10 @@ export const pageMeta = {
 	"/cotg-submission": {
 		title: "CoTG",
 		description: "Submissions aren't open yet.",
+	},
+	"/cheat-codes": {
+		title: "Cheat codes",
+		description: "Head Mode, Dance Mode, Australia Mode. Use responsibly.",
 	},
 };
 export const notFoundMeta = {

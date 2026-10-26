@@ -21,6 +21,10 @@
       try {
         const theme = localStorage.getItem('theme')
         if (theme) document.documentElement.dataset.theme = theme
+        // Cheat codes switched on earlier this session (components/Cheats.jsx)
+        for (const id of JSON.parse(sessionStorage.getItem('cheats') || '[]')) {
+          document.documentElement.setAttribute('data-cheat-' + id, '')
+        }
       } catch {}
     </script>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />

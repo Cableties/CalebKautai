@@ -1,0 +1,217 @@
+import { CHEATS } from '../../src/components/Cheats.jsx'
+import { expect, openNav, test } from './fixtures.js'
+
+const html = (page) => page.locator('html')
+const cheatSwitch = (page, name) => page.getByRole('switch', { name, exact: true })
+const toggleCheat = (page, name) => cheatSwitch(page, name).click()
+
+async function openCheats(page) {
+  await page.goto('/')
+  await openNav(page)
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Cheat codes' }).click()
+  await expect(page.getByRole('heading', { name: 'Cheat codes', level: 1 })).toBeVisible()
+}
+
+test('each cheat switches on and off from the cheat codes page', async ({ page }) => {
+  await openCheats(page)
+  for (const { name, id } of CHEATS) {
+    const attr = `data-cheat-${id}`
+    const sw = cheatSwitch(page, name)
+    await expect(sw).toHaveAttribute('aria-checked', 'false')
+    await sw.click()
+    await expect(sw).toHaveAttribute('aria-checked', 'true')
+    await expect(html(page)).toHaveAttribute(attr, '')
+    await expect(page.getByText(`${name} activated`)).toBeVisible()
+    await sw.click()
+    await expect(html(page)).not.toHaveAttribute(attr, '')
+  }
+})
+
+test('Head Mode puts the bouncing head on every page', async ({ page }) => {
+  await openCheats(page)
+  await expect(page.locator('.bounce-head')).toHaveCount(0)
+  await toggleCheat(page, 'Head Mode')
+  await expect(page.locator('.bounce-head')).toHaveCount(1)
+  await openNav(page)
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Work' }).click()
+  await expect(page).toHaveURL('/work')
+  await expect(page.locator('.bounce-head')).toHaveCount(1)
+  // Only one head on the page that already had its own
+  await page.goto('/tattoo-good-friend')
+  await expect(page.locator('.bounce-head')).toHaveCount(1)
+})
+
+test('Dance Mode cycles the colours', async ({ page }) => {
+  await openCheats(page)
+  await toggleCheat(page, 'Dance Mode')
+  const colour = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--pink').trim())
+  const first = await colour()
+  await page.waitForTimeout(700)
+  expect(await colour()).not.toBe(first)
+})
+
+test('Australia Mode turns the site upside down, and links still work', async ({ page }) => {
+  await openCheats(page)
+  await toggleCheat(page, 'Australia Mode')
+  await page.waitForTimeout(1000) // the flip animation
+  const turned = await page.evaluate(() => new DOMMatrix(getComputedStyle(document.getElementById('root')).transform))
+  expect(Math.round(turned.a)).toBe(-1)
+  expect(Math.round(turned.d)).toBe(-1)
+  // The header is now at the bottom of the screen, upside down, and still clickable
+  const header = await page.locator('.site-header').boundingBox()
+  const viewport = page.viewportSize()
+  expect(header.y).toBeGreaterThan(viewport.height / 2)
+  await page.getByRole('link', { name: 'Caleb Kautai, home' }).click()
+  await expect(page).toHaveURL('/')
+})
+
+test('cheats last through reloads in the same session, and can all be turned off', async ({ page }) => {
+  await openCheats(page)
+  await toggleCheat(page, 'Dance Mode')
+  await toggleCheat(page, 'Australia Mode')
+  await page.reload()
+  // Applied before the page's JavaScript runs, so nothing flips back and forth
+  await expect(html(page)).toHaveAttribute('data-cheat-australia', '')
+  await expect(cheatSwitch(page, 'Australia Mode')).toHaveAttribute('aria-checked', 'true')
+  await page.getByRole('button', { name: 'Turn everything off' }).click()
+  await expect(html(page)).not.toHaveAttribute('data-cheat-australia', '')
+  await expect(html(page)).not.toHaveAttribute('data-cheat-dance', '')
+})
+
+test('typing a code on the keyboard toggles its cheat', async ({ page }) => {
+  test.skip(test.info().project.name === 'iphone', 'phones have no keyboard to type on')
+  await page.goto('/work')
+  await page.keyboard.type('gday')
+  await expect(html(page)).toHaveAttribute('data-cheat-australia', '')
+  await expect(page.getByText('Australia Mode activated')).toBeVisible()
+  await page.keyboard.type('GDAY')
+  await expect(html(page)).not.toHaveAttribute('data-cheat-australia', '')
+})
+
+test('typing in a form field does not trigger cheats', async ({ page }) => {
+  test.skip(test.info().project.name === 'iphone', 'phones have no keyboard to type on')
+  await page.goto('/tattoo-love-interest')
+  await page.getByLabel('Position applying for').fill('')
+  await page.getByLabel('Position applying for').pressSequentially('HEAD')
+  await expect(html(page)).not.toHaveAttribute('data-cheat-head', '')
+})
+
+test('Big Head Mode turns photos into bobbleheads and doubles the bouncing head', async ({ page }) => {
+  await openCheats(page)
+  await toggleCheat(page, 'Head Mode')
+  const width = () => page.locator('.bounce-head').evaluate((el) => el.getBoundingClientRect().width)
+  const normal = await width()
+  await toggleCheat(page, 'Big Head Mode')
+  await expect.poll(width).toBeCloseTo(normal * 2, 0)
+  await page.goto('/about')
+  const portrait = page.locator('.portrait')
+  await expect.poll(() => portrait.evaluate((el) => getComputedStyle(el).scale)).toBe('1.45')
+  expect(await portrait.evaluate((el) => getComputedStyle(el).animationName)).toBe('bobble')
+})
+
+test('8-bit Mode uses the pixel font and pixelates photos', async ({ page }) => {
+  await openCheats(page)
+  await toggleCheat(page, '8-bit Mode')
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain('Press Start 2P')
+  await expect(page.locator('#cheat-pixelate')).toBeAttached()
+  await expect(page.locator('link[href*="Press+Start+2P"]')).toBeAttached()
+  await page.goto('/about')
+  expect(await page.locator('.portrait').evaluate((el) => getComputedStyle(el).filter)).toContain('cheat-pixelate')
+})
+
+test('Matrix Mode goes green with code raining behind the page', async ({ page }) => {
+  await openCheats(page)
+  await toggleCheat(page, 'Matrix Mode')
+  await expect(page.locator('canvas.matrix-rain')).toBeAttached()
+  expect(await page.evaluate(() => getComputedStyle(document.body).color)).toBe('rgb(77, 255, 136)')
+  await toggleCheat(page, 'Matrix Mode')
+  await expect(page.locator('canvas.matrix-rain')).toHaveCount(0)
+})
+
+test('Gravity Mode knocks things off the page instead of following links, and tidies up when off', async ({ page }) => {
+  await openCheats(page)
+  await toggleCheat(page, 'Gravity Mode')
+  await page.goto('/work')
+  const heading = page.locator('.project').first().getByRole('heading')
+  await heading.scrollIntoViewIfNeeded()
+  const before = (await heading.boundingBox()).y
+  await heading.click()
+  await page.waitForTimeout(1500)
+  // The heading fell; tapping a link inside the page doesn't navigate either
+  expect((await heading.boundingBox()).y).toBeGreaterThan(before + 50)
+  await page.getByRole('link', { name: 'More on GitHub' }).click()
+  await expect(page).toHaveURL('/work')
+  // The header still works, to get back to the switches
+  await openNav(page)
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Cheat codes' }).click()
+  await toggleCheat(page, 'Gravity Mode')
+  await page.goto('/work')
+  await page.getByRole('link', { name: 'More on GitHub' }).click({ trial: true })
+})
+
+test('Gravity Mode switched off puts fallen things back', async ({ page }) => {
+  await page.goto('/cheat-codes')
+  await toggleCheat(page, 'Gravity Mode')
+  const lede = page.locator('.lede')
+  const before = (await lede.boundingBox()).y
+  await lede.click()
+  await page.waitForTimeout(1500)
+  expect((await lede.boundingBox()).y).toBeGreaterThan(before + 50)
+  await toggleCheat(page, 'Gravity Mode')
+  expect(Math.round((await lede.boundingBox()).y)).toBe(Math.round(before))
+})
+
+test('Comic Sans Mode', async ({ page }) => {
+  await openCheats(page)
+  await toggleCheat(page, 'Comic Sans Mode')
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontFamily)).toContain('Comic')
+})
+
+test('Head Trail drops little heads behind the cursor', async ({ page }) => {
+  test.skip(test.info().project.name === 'iphone', 'checked with a mouse')
+  await openCheats(page)
+  await toggleCheat(page, 'Head Trail')
+  for (let i = 0; i < 8; i++) {
+    await page.mouse.move(100 + i * 30, 300)
+    await page.waitForTimeout(60)
+  }
+  expect(await page.locator('.head-trail').count()).toBeGreaterThan(2)
+})
+
+test('Night Vision tints the whole site, and the player stays pinned to the screen', async ({ page }) => {
+  await page.goto('/aliens')
+  await page.getByRole('button', { name: "Play Mika's interview" }).click()
+  await page.evaluate(() => document.documentElement.setAttribute('data-cheat-night', ''))
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).filter)).toContain('sepia')
+  const player = page.getByRole('region', { name: 'Podcast player' })
+  const box = await player.boundingBox()
+  expect(box.y + box.height).toBeGreaterThan(page.viewportSize().height - 40)
+})
+
+test('the Konami code replays the hack anywhere', async ({ page }) => {
+  test.skip(test.info().project.name === 'iphone', 'phones use the Run button')
+  await page.goto('/work')
+  for (const key of ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight', 'b', 'a']) {
+    await page.keyboard.press(key)
+  }
+  const hack = page.getByRole('dialog', { name: /hacking in progress/i })
+  await expect(hack).toBeVisible()
+  await expect(hack.getByText('CHEATER DETECTED')).toBeAttached()
+  await page.getByRole('button', { name: 'Skip hack' }).click()
+  await expect(hack).toBeHidden()
+  await expect(page).toHaveURL('/work')
+})
+
+test('the Konami code has a Run button for phones', async ({ page }) => {
+  await page.goto('/cheat-codes')
+  await page.getByRole('button', { name: 'Run' }).click()
+  await expect(page.getByRole('dialog', { name: /hacking in progress/i })).toBeVisible()
+})
+
+test('typing BIGHEAD switches on Big Head Mode only, not Head Mode too', async ({ page }) => {
+  test.skip(test.info().project.name === 'iphone', 'phones have no keyboard to type on')
+  await page.goto('/work')
+  await page.keyboard.type('bighead')
+  await expect(html(page)).toHaveAttribute('data-cheat-bighead', '')
+  await expect(html(page)).not.toHaveAttribute('data-cheat-head', '')
+})

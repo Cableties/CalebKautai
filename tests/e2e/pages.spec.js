@@ -65,3 +65,62 @@ test('find me shows coordinates and a map', async ({ page }) => {
   await expect(page.getByText('Latitude')).toBeVisible()
   await expect(page.locator('.map iframe')).toHaveAttribute('src', /maps\?q=-27\.\d+,15[23]\.\d+/)
 })
+
+test.describe('bouncing head on the good friend page', () => {
+  test('bounces around without getting in the way of taps', async ({ page }) => {
+    await page.goto('/tattoo-good-friend')
+    const head = page.locator('.bounce-head')
+    await expect(head).toBeAttached()
+    const first = await head.evaluate((el) => el.style.transform)
+    await page.waitForTimeout(500)
+    expect(await head.evaluate((el) => el.style.transform)).not.toBe(first)
+    // Crisp pixel art: one frame of the sprite sheet at a time, scaled up without smoothing
+    expect(await head.evaluate((el) => getComputedStyle(el).imageRendering)).toBe('pixelated')
+    const { SPRITE, TILTS, POSES } = await import('../../src/lib/bounce.js')
+    for (let i = 0; i < 10; i++) {
+      const [bx, by, px] = await head.evaluate((el) => [
+        ...el.style.backgroundPosition.split(' ').map(parseFloat),
+        parseFloat(el.style.getPropertyValue('--px')),
+      ])
+      const col = -bx / (SPRITE.width * px)
+      const row = -by / (SPRITE.height * px)
+      expect(Number.isInteger(col) && col >= 0 && col < TILTS.length, `column ${col}`).toBe(true)
+      expect(Number.isInteger(row) && row >= 0 && row < POSES.length, `row ${row}`).toBe(true)
+      await page.waitForTimeout(100)
+    }
+    // Taps pass straight through it to whatever is underneath
+    expect(await head.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none')
+  })
+
+  test('moves smoothly, on every frame', async ({ page }) => {
+    await page.goto('/tattoo-good-friend')
+    await page.waitForTimeout(300)
+    // The head's on-screen movement for each animation frame over 2 seconds, scaled to a 60fps frame
+    const steps = await page.evaluate(
+      () =>
+        new Promise((done) => {
+          const el = document.querySelector('.bounce-head')
+          const out = []
+          let prev = null
+          const start = performance.now()
+          function read(now) {
+            const m = new DOMMatrix(getComputedStyle(el).transform)
+            if (prev && now - prev[2] > 8 && now - prev[2] < 25) out.push(Math.hypot(m.e - prev[0], m.f - prev[1]) * (16.7 / (now - prev[2])))
+            prev = [m.e, m.f, now]
+            now - start < 2000 ? requestAnimationFrame(read) : done(out)
+          }
+          requestAnimationFrame(read)
+        }),
+    )
+    // Snapping to the art's 2–3px grid used to freeze it on some frames and jump on others
+    const frozen = steps.filter((s) => s < 0.5).length
+    expect(frozen, `${frozen} of ${steps.length} frames without movement`).toBeLessThanOrEqual(steps.length * 0.05)
+  })
+
+  test('is left out for reduced motion', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await page.goto('/tattoo-good-friend')
+    await expect(page.getByRole('heading', { name: 'Hey buddy!' })).toBeVisible()
+    await expect(page.locator('.bounce-head')).toHaveCount(0)
+  })
+})

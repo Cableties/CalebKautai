@@ -1832,3 +1832,357 @@ a {
     transition-duration: 0.06s;
   }
 }
+
+/* Good friend page: the bouncing head, as pixel art (BouncingHead.jsx moves it and picks the
+   sprite; --px is the on-screen size of one art pixel). Under the header menu and player, and never
+   in the way of taps. */
+.bounce-head {
+  --px: 2px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 40;
+  width: calc(var(--w) * var(--px));
+  height: calc(var(--h) * var(--px));
+  background: var(--sheet) 0 0 / calc(var(--w) * var(--cols) * var(--px)) calc(var(--h) * var(--rows) * var(--px)) no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+  will-change: transform;
+  /* A one-pixel black outline and a hard, blur-free shadow, in whole art pixels */
+  filter: drop-shadow(var(--px) 0 0 #000) drop-shadow(calc(-1 * var(--px)) 0 0 #000) drop-shadow(0 var(--px) 0 #000)
+    drop-shadow(0 calc(-1 * var(--px)) 0 #000) drop-shadow(calc(2 * var(--px)) calc(2 * var(--px)) 0 rgb(0 0 0 / 0.35));
+}
+
+/* ---------- Cheat codes ---------- */
+.cheat-list {
+  display: grid;
+  gap: 14px;
+  max-width: 720px;
+  margin: 32px 0 28px;
+  padding: 0;
+  list-style: none;
+}
+.cheat-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px;
+  color: #e8f6ff;
+  background: #14121f;
+  border: 2px solid #2c2942;
+  border-radius: 14px;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.cheat-list li.on {
+  border-color: #7fe7ff;
+  box-shadow: 0 0 0 1px #7fe7ff, 0 0 22px -6px #7fe7ff;
+}
+.cheat-text h2 {
+  margin: 0 0 6px;
+  font: 800 1.3rem/1.1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.cheat-text p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #b9c3d6;
+}
+.cheat-code {
+  margin-top: 8px !important;
+}
+.cheat-code kbd {
+  padding: 2px 7px;
+  font: inherit;
+  font-weight: 700;
+  color: #14121f;
+  background: #f7b6d2;
+  border-radius: 4px;
+  letter-spacing: 0.15em;
+}
+/* A chunky arcade switch */
+.cheat-switch {
+  flex: none;
+  position: relative;
+  width: 84px;
+  height: 40px;
+  padding: 0;
+  font: 800 0.85rem/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color: #6c6888;
+  background: #2c2942;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.cheat-switch::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #6c6888;
+  transition: transform 0.22s cubic-bezier(0.3, 1.4, 0.5, 1), background-color 0.2s ease;
+}
+.cheat-switch-label {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.cheat-switch[aria-checked='true'] {
+  color: #14121f;
+  background: #7fe7ff;
+}
+.cheat-switch[aria-checked='true']::before {
+  transform: translateX(44px);
+  background: #14121f;
+}
+.cheat-switch[aria-checked='true'] .cheat-switch-label {
+  right: auto;
+  left: 16px;
+}
+.cheat-switch:focus-visible {
+  outline: 3px solid #f7b6d2;
+  outline-offset: 3px;
+}
+.cheats .button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (max-width: 480px) {
+  .cheat-list li {
+    padding: 16px;
+  }
+}
+
+/* "Cheat activated" pop-up */
+.cheat-toast {
+  position: fixed;
+  left: 50%;
+  top: max(16px, env(safe-area-inset-top));
+  z-index: 120;
+  margin: 0;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.cheat-toast span {
+  display: block;
+  padding: 10px 18px;
+  color: #14121f;
+  background: #7fe7ff;
+  border-radius: 999px;
+  font: 800 0.95rem/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.5);
+  animation: toast 2.5s ease both;
+}
+@keyframes toast {
+  0% { opacity: 0; transform: translateY(-12px) scale(0.9); }
+  10%, 85% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
+/* Dance Mode: every accent colour is worked out from one hue that keeps turning, so the whole
+   palette rotates together like disco lights. Smooth, never flashing. Text colours stay put, and the
+   fills/inks keep the lightness that keeps them readable in each theme. */
+@property --disco {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+:root[data-cheat-dance] {
+  --fill-l: 0.86;
+  --ink-l: 0.52;
+  --pink: oklch(var(--fill-l) 0.11 var(--disco));
+  --blue: oklch(var(--fill-l) 0.11 calc(var(--disco) + 72));
+  --mint: oklch(var(--fill-l) 0.11 calc(var(--disco) + 144));
+  --lilac: oklch(var(--fill-l) 0.11 calc(var(--disco) + 216));
+  --yellow: oklch(var(--fill-l) 0.11 calc(var(--disco) + 288));
+  --pink-ink: oklch(var(--ink-l) 0.19 var(--disco));
+  --blue-ink: oklch(var(--ink-l) 0.17 calc(var(--disco) + 180));
+  /* 20 colour updates a second: smooth to the eye, and far lighter on phones than every frame,
+     since each update restyles the whole page */
+  animation: disco 6s steps(120) infinite;
+}
+:root[data-cheat-dance][data-theme='dark'] {
+  --fill-l: 0.5;
+  --ink-l: 0.84;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-cheat-dance]:not([data-theme='light']) {
+    --fill-l: 0.5;
+    --ink-l: 0.84;
+  }
+}
+@keyframes disco {
+  to {
+    --disco: 360;
+  }
+}
+
+/* Australia Mode: the whole site upside down. The page scrolls inside #root (fixed to the screen),
+   so the player, pop-ups and bouncing head flip with it instead of escaping to the right way up. */
+:root[data-cheat-australia],
+:root[data-cheat-australia] body {
+  height: 100%;
+  overflow: hidden;
+}
+:root[data-cheat-australia] #root {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  transform: rotate(180deg);
+  animation: down-under 0.9s cubic-bezier(0.5, 0, 0.2, 1.2);
+}
+@keyframes down-under {
+  from {
+    transform: rotate(0deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-cheat-australia] #root {
+    animation: none;
+  }
+}
+
+/* The Konami row's Run button */
+.cheat-run {
+  flex: none;
+  min-width: 84px;
+  height: 40px;
+  padding: 0 18px;
+  font: 800 0.9rem/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #14121f;
+  background: #f7b6d2;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.cheat-run:hover {
+  background: #7fe7ff;
+}
+.cheat-secret {
+  border-style: dashed !important;
+}
+
+/* Big Head Mode: photos of me become wobbling bobbleheads (the bouncing head doubles in
+   BouncingHead.jsx). Uses the separate scale/rotate properties so it stacks with other effects. */
+:root[data-cheat-bighead] :is(.portrait, .friend-gif, .tattoo-face, .perk img, .tattoo-gif) {
+  position: relative;
+  z-index: 2;
+  scale: 1.45;
+  transform-origin: 50% 90%;
+  animation: bobble 1.3s ease-in-out infinite;
+}
+@keyframes bobble {
+  0%, 100% { rotate: -7deg; }
+  50% { rotate: 7deg; }
+}
+
+/* 8-bit Mode: pixel font, square corners, chunky shadows, and pixelated photos (the SVG filter is
+   in CheatEffects.jsx). The font is wide, so the big headings come down a size. */
+:root[data-cheat-8bit] {
+  --display: 'Press Start 2P', ui-monospace, monospace;
+  --body: 'Press Start 2P', ui-monospace, monospace;
+  font-size: 75%;
+}
+:root[data-cheat-8bit] body {
+  line-height: 1.9;
+}
+:root[data-cheat-8bit] * {
+  border-radius: 0 !important;
+}
+:root[data-cheat-8bit] :is(h1, h2, h3) {
+  overflow-wrap: anywhere;
+}
+:root[data-cheat-8bit] .hero-name {
+  font-size: clamp(2.2rem, 13vw, 10rem);
+}
+:root[data-cheat-8bit] .page-title {
+  font-size: clamp(1.6rem, 6vw, 3.5rem);
+}
+:root[data-cheat-8bit] img {
+  filter: url(#cheat-pixelate);
+  image-rendering: pixelated;
+}
+:root[data-cheat-8bit] :is(.button, .card, .project, .choice, .interview-play, .cheat-list li, .player) {
+  box-shadow: 4px 4px 0 var(--ink) !important;
+}
+.pixel-filter {
+  position: absolute;
+  width: 0;
+  height: 0;
+}
+
+/* Matrix Mode: black and green, with code raining behind the page (CheatEffects.jsx) */
+:root[data-cheat-matrix] {
+  --paper: #000;
+  --paper-2: #03140a;
+  --ink: #4dff88;
+  --ink-soft: #2fbf64;
+  --pink: #0b3d1d;
+  --blue: #0f5229;
+  --mint: #0b3d1d;
+  --lilac: #0f5229;
+  --yellow: #14662f;
+  --pink-ink: #9dffb9;
+  --blue-ink: #4dff88;
+  --line: rgb(77 255 136 / 0.25);
+  --card-mix: 100%;
+  --blend: screen;
+  --body: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --display: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+.matrix-rain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+/* Comic Sans Mode (phones don't have Comic Sans, so Comic Neue stands in) */
+:root[data-cheat-comic] {
+  --display: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive;
+  --body: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive;
+}
+
+/* Head Trail: one tiny pixel head from the bouncing head's sprite sheet (CheatEffects.jsx) */
+.head-trail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 45;
+  width: 48px;
+  height: 56px;
+  background: url(/images/bounce-sprites.png) no-repeat;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+/* Night Vision: green goggles with scanlines and a dark vignette. The filter is on <html>, the one
+   element where it doesn't stop fixed things (player, head) staying put on screen. */
+:root[data-cheat-night] {
+  filter: grayscale(1) sepia(1) hue-rotate(60deg) saturate(2.6) brightness(0.95) contrast(1.15);
+}
+:root[data-cheat-night] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 2px, rgb(0 0 0 / 0.18) 2px 3px),
+    radial-gradient(ellipse at center, transparent 55%, rgb(0 0 0 / 0.75) 100%);
+}
