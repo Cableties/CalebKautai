@@ -7,3 +7,8 @@ audio-src
 test-results
 playwright-report
 .vercel
+
+# AI assistant skill packs (installed with the Upstash integration)
+.agents
+.claude
+skills-lock.json
