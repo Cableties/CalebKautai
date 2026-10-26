@@ -4,3 +4,6 @@ dist-ssr
 *.log
 .env*
 audio-src
+test-results
+playwright-report
+.vercel

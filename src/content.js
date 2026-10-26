@@ -199,6 +199,152 @@ export const alchemy = {
 	tagline: "Melbourne's premier game masters for hire",
 };
 
+// Work page: what I can do, grouped.
+export const skills = [
+	{
+		group: "Identity & access",
+		items: [
+			"ForgeRock Access Manager",
+			"Identity Manager",
+			"Identity Gateway",
+			"Directory Services",
+		],
+	},
+	{
+		group: "Code",
+		items: ["Java", "JavaScript", "React", "Python", "Kotlin"],
+	},
+	{
+		group: "Design & media",
+		items: [
+			"Adobe Creative Cloud",
+			"Photo editing",
+			"Animation",
+			"Video & VFX",
+			"Audio editing",
+		],
+	},
+];
+
+// Work page: selected projects. `image` is a key from `images` above; `link` is optional.
+export const projects = [
+	{
+		name: "Identity platform replacement",
+		context: "Suncorp Bank · ForgeRock developer",
+		summary:
+			"Migrating the bank's identity services onto an on-prem ForgeRock platform.",
+		points: [
+			"Working across ForgeRock Identity Gateway, Identity Manager, Directory Services and Access Manager.",
+			"Building and integrating custom Java extensions for Access Manager.",
+		],
+		tags: ["ForgeRock", "Java", "IAM"],
+	},
+	{
+		name: "WristChord",
+		context: "Galaxy Watch app · in progress",
+		summary:
+			"Guitar and ukulele chord charts on your wrist, scrolling along while you play.",
+		points: [
+			"Wear OS app with song search, hands-free scrolling controlled by the watch's rotating bezel, adjustable scroll speed and chord transposition.",
+			"Works out ukulele chord shapes from music theory instead of a lookup table, so every key lands on the easiest fingering.",
+			"Companion phone app that syncs saved songs to the watch, plus a small Go backend with caching that serves the chord data.",
+		],
+		tags: ["Kotlin", "Wear OS", "Jetpack Compose", "Go"],
+		link: "https://github.com/Cableties/WristChord-WearOs",
+	},
+	{
+		name: "brb",
+		context: "Android app · in progress",
+		summary:
+			"Fakes an incoming phone call so you can escape a conversation.",
+		points: [
+			"Convincing call screens in two styles, a classic mobile call or a work video call, using the phone's own ringtone.",
+			"Answering plays a muffled voice through the earpiece, with working mute and speaker buttons, and the screen switches off when the phone meets your ear.",
+		],
+		tags: ["Kotlin", "Android", "Jetpack Compose"],
+		link: "https://github.com/Cableties/brb",
+	},
+	{
+		name: "Masters of Alchemy",
+		context: "Sole developer",
+		summary: `Website for ${alchemy.tagline}: a service that books dungeon masters for Dungeons & Dragons games.`,
+		points: [
+			"Designed and built the whole site on my own.",
+			"Still in use by the business today.",
+		],
+		tags: ["Web development", "Design"],
+		image: "alchemyBanner",
+		link: "https://www.mastersofalchemy.au/",
+	},
+	{
+		name: "calebkautai.com",
+		context: "Personal site · this one",
+		summary:
+			"Rebuilt from Wix as a custom React site, with a QR-code tattoo that lands on its own page.",
+		points: [
+			"Every page prerendered to static HTML for fast loads and proper link previews.",
+			"Serverless scan counter and reviews, a podcast player that keeps playing between pages, and automated browser tests on every push.",
+		],
+		tags: ["React", "Vite", "Vercel", "Playwright"],
+		link: "https://github.com/Cableties/CalebKautai",
+	},
+	{
+		name: "Aliens! podcast",
+		context: "Creative project",
+		summary:
+			"One question, asked of everyone: who here is secretly an alien?",
+		points: [
+			"18 recorded interviews and counting, with a running tally of the most suspected.",
+		],
+		tags: ["Audio", "Interviewing"],
+		to: "/aliens",
+	},
+];
+
+export const githubProfile = "https://github.com/Cableties";
+
+// Reviews left on the old Wix tattoo page (all 5 stars), shown under the new ones and counted in
+// the average. Emails left out.
+export const oldReviews = [
+	{ name: "Silly McBilly", rating: 5, comment: "Shared 4105", date: "2025-12-10" },
+	{ name: "Liam", rating: 5, comment: "Changed my life", date: "2025-02-08" },
+	{ name: "Nick", rating: 5, comment: "Awesome", date: "2024-12-20" },
+	{ name: "H", rating: 5, comment: "awesome", date: "2024-04-16" },
+	{
+		name: "Secret Admirer",
+		rating: 5,
+		comment: "I had a great time on this website! I love surfing the web",
+		date: "2023-12-17",
+	},
+	{ name: "Kevin Zhou", rating: 5, comment: "🔥🔥", date: "2023-12-13" },
+	{
+		name: "Saima Hassan",
+		rating: 5,
+		comment: "So cool..🔥🔥👏🏼👏🏼",
+		date: "2023-09-04",
+	},
+	{ name: "fringly slompo", rating: 5, comment: "You are cool", date: "2023-04-13" },
+	{
+		name: "Aunty Tania",
+		rating: 5,
+		comment: "This is pretty fukin cool nephew 👍😁",
+		date: "2023-03-30",
+	},
+	{
+		name: "Jimbles Blonkby",
+		rating: 5,
+		comment:
+			"Very epic i love it so much i'm your biggest fan ❤❤😳😳😳😍😍😍😍😍😍😆😆😆😆😆😆😆😆😆",
+		date: "2023-03-27",
+	},
+	{
+		name: "Cableties",
+		rating: 5,
+		comment: "Wow great tattoo! I love it!❤",
+		date: "2023-03-27",
+	},
+];
+
 // "Find me" — a random spot inside this box (inner Brisbane, stopping short of the bay) on every load.
 export const brisbaneBounds = {
 	south: -27.56,

@@ -32,6 +32,31 @@ To add or replace one, put the original (jpg/png/gif) in `images-src/`, run `nod
 
 Original recordings go in `audio-src/`. `npm run compress-audio` turns them into small mono files in `public/audio/` (named in lowercase with dashes, e.g. `Matt D.m4a` becomes `matt-d.m4a`). Set the interview's `audio` field in `src/content.js` to match. `audio-src/` is too big for git, so it isn't committed: keep your own copy of the originals.
 
+## Scan counter and reviews
+
+The tattoo page's scan counter and star reviews run on two small Vercel functions in `api/`, storing data in Upstash Redis. To connect the database (once), run `vercel integration add upstash` in a terminal, create a free Redis database, and connect it to the `caleb-kautai` project. Vercel adds the credentials as environment variables; redeploy afterwards. Until then the site works without them: the counter and review form stay hidden, and the old Wix comments still show.
+
+Star ratings count straight away. Written comments wait for approval:
+
+```bash
+vercel env pull .env.local         # once, to get the database credentials locally
+npm run reviews                    # list comments waiting for approval
+npm run reviews -- approve <id>    # publish one (or: approve all)
+npm run reviews -- delete <id>     # remove a review and its rating
+```
+
+Set `REVIEWS_AUTO_APPROVE=1` in Vercel's environment variables to skip approval. Comments from the old Wix site are in `oldReviews` in `src/content.js`.
+
+To try the functions locally, use `vercel dev` instead of `npm run dev`.
+
+## Tests
+
+```bash
+npm run build && npm test   # unit tests, then browser tests on desktop Chrome and an iPhone
+```
+
+The browser tests (`tests/e2e/`) use fake API responses, so they don't touch the real database. They also run on GitHub for every push (`.github/workflows/checks.yml`). First time locally: `npx playwright install chromium webkit`.
+
 ## Still to do
 
 1. **Application form**: create a free form at [formspree.io](https://formspree.io) and paste its endpoint into `contact.formEndpoint` in `src/content.js`. Until then, submitting opens the visitor's email app instead.

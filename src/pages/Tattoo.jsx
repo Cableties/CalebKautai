@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import Reviews from '../components/Reviews.jsx'
 import { img } from '../content.js'
 
 const choices = [
@@ -10,7 +11,27 @@ const choices = [
 
 // The fake "hack" plays once per visit; coming back from a choice page skips it.
 const SEEN_KEY = 'tattoo-hack-seen'
+// Each browser session counts as one scan (the API also limits repeats per visitor).
+const COUNTED_KEY = 'tattoo-scan-counted'
 const INTRO_MS = 5600
+
+function useScanCount() {
+  const [count, setCount] = useState(null)
+  useEffect(() => {
+    let counted = false
+    try {
+      counted = sessionStorage.getItem(COUNTED_KEY) === '1'
+      sessionStorage.setItem(COUNTED_KEY, '1')
+    } catch {
+      // Storage blocked: the API's own limit stops double counting
+    }
+    fetch('/api/scans', { method: counted ? 'GET' : 'POST' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => data && setCount(data.count))
+      .catch(() => {}) // No counter (e.g. local dev without the API): the page just leaves it out
+  }, [])
+  return count
+}
 
 // Everything here is read in the visitor's own browser for the joke and never leaves it.
 function readDevice() {
@@ -36,6 +57,7 @@ export default function Tattoo() {
   const [intro, setIntro] = useState(true)
   const [info, setInfo] = useState(null)
   const [battery, setBattery] = useState(null)
+  const scans = useScanCount()
 
   useLayoutEffect(() => {
     let seen = false
@@ -94,6 +116,7 @@ export default function Tattoo() {
             <p className="hack-granted" data-text="ACCESS GRANTED">
               ACCESS GRANTED
             </p>
+            {scans !== null && <p className="hack-victim">You are victim #{scans.toLocaleString()}</p>}
           </div>
           <button type="button" className="hack-skip" onClick={finish}>
             Skip hack →
@@ -111,6 +134,11 @@ export default function Tattoo() {
         <p className="lede">
           That's so amazing! While I steal your bank information, why not stick around and check out some stuff?
         </p>
+        {scans !== null && (
+          <p className="scan-count">
+            <strong>{scans.toLocaleString()}</strong> {scans === 1 ? 'person has' : 'people have'} scanned this tattoo
+          </p>
+        )}
         <h2 className="choice-prompt">
           <span className="prompt-caret" aria-hidden="true">
             &gt;
@@ -129,6 +157,7 @@ export default function Tattoo() {
             </li>
           ))}
         </ol>
+        <Reviews />
       </article>
     </>
   )

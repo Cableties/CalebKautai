@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { PauseIcon, PlayIcon, usePlayer } from '../components/Player.jsx'
 import { alienIdentifiers, interviews } from '../content.js'
 
 const unique = (key) => [...new Set(interviews.map((i) => i[key]))].sort()
@@ -6,6 +7,7 @@ const unique = (key) => [...new Set(interviews.map((i) => i[key]))].sort()
 export default function Aliens() {
   const [guest, setGuest] = useState('')
   const [suspect, setSuspect] = useState('')
+  const player = usePlayer()
 
   const shown = interviews.filter((i) => (!guest || i.guest === guest) && (!suspect || i.suspect === suspect))
 
@@ -75,23 +77,36 @@ export default function Aliens() {
           <p className="notice">Nobody has accused anyone matching both filters. Yet.</p>
         ) : (
           <ul className={'interviews' + (hasAudio ? '' : ' no-audio')}>
-            {shown.map((i) => (
-              <li key={i.guest + i.suspect}>
-                <div className="interview-who">
-                  <span className="interview-guest">{i.guest}</span>
-                  <span className="interview-accuses">
-                    suspects <strong>{i.suspect}</strong>
-                  </span>
-                </div>
-                {hasAudio &&
-                  (i.audio ? (
-                    <audio controls preload="none" src={i.audio} />
-                  ) : (
-                    <span className="muted">Audio coming soon</span>
-                  ))}
-                <span className="interview-length">{i.length}</span>
-              </li>
-            ))}
+            {shown.map((i) => {
+              const current = player.track?.src === i.audio
+              const track = { src: i.audio, title: `${i.guest} suspects ${i.suspect}`, artist: 'Aliens! podcast' }
+              return (
+                <li key={i.guest + i.suspect} className={current ? 'current' : ''}>
+                  {hasAudio &&
+                    (i.audio ? (
+                      <button
+                        type="button"
+                        className="interview-play"
+                        onClick={() => player.toggle(track)}
+                        aria-label={`${current && player.playing ? 'Pause' : 'Play'} ${i.guest}'s interview`}
+                      >
+                        {current && player.playing ? <PauseIcon /> : <PlayIcon />}
+                      </button>
+                    ) : (
+                      <span className="interview-play muted" title="Audio coming soon">
+                        …
+                      </span>
+                    ))}
+                  <div className="interview-who">
+                    <span className="interview-guest">{i.guest}</span>
+                    <span className="interview-accuses">
+                      suspects <strong>{i.suspect}</strong>
+                    </span>
+                  </div>
+                  <span className="interview-length">{i.length}</span>
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

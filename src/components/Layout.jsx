@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Analytics } from '@vercel/analytics/react'
 import { contact, nav, socials } from '../content.js'
 import { metaFor, pageTitle } from '../meta.js'
+import { PlayerBar, PlayerProvider } from './Player.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
 
 export default function Layout() {
@@ -18,7 +19,7 @@ export default function Layout() {
   }, [pathname])
 
   return (
-    <>
+    <PlayerProvider>
       <a className="skip" href="#main">
         Skip to content
       </a>
@@ -71,7 +72,8 @@ export default function Layout() {
           © 2022–{new Date().getFullYear()} by Caleb Kautai. <span className="muted">(Surprise surprise.)</span>
         </p>
       </footer>
+      <PlayerBar />
       <Analytics />
-    </>
+    </PlayerProvider>
   )
 }
