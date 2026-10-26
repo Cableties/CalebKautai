@@ -598,22 +598,245 @@ p {
   }
 }
 
-/* Tattoo */
+/* ---------- Tattoo: the fake hack, then the page ---------- */
+html.no-scroll {
+  overflow: hidden;
+}
+
+/* The intro runs entirely on this CSS timeline (so it clears itself even without JS):
+   0.25–2.5s log lines type in · 2.9–4.2s download bar · 4.3s ACCESS GRANTED + shake · 5.15s fade out.
+   Nothing flashes faster than ~1/s. */
+.hack {
+  --hack-bg: #0d0c16;
+  --hack-text: #bfe8d6;
+  --hack-pink: #f7b6d2;
+  --hack-blue: #a9d4f2;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 24px;
+  padding: max(24px, env(safe-area-inset-top)) 20px max(20px, env(safe-area-inset-bottom));
+  background: var(--hack-bg);
+  color: var(--hack-text);
+  font: 500 clamp(0.95rem, 3.8vw, 1.15rem) / 1.5 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  overflow: hidden;
+  animation: hack-out 0.45s 5.15s ease-in forwards;
+}
+/* CRT scanlines over the whole intro */
+.hack::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 2px, rgb(0 0 0 / 0.25) 2px 4px);
+}
+.hack-screen {
+  max-width: 34rem;
+  animation: shake 0.5s 4.3s both;
+}
+.hack-alert {
+  color: var(--hack-pink);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  animation: blink 1s steps(1) infinite;
+}
+.hack-log {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+}
+.hack-log li {
+  clip-path: inset(0 100% 0 0);
+  animation: type 0.35s steps(22) forwards;
+}
+.hack-log li:nth-child(1) { animation-delay: 0.25s; }
+.hack-log li:nth-child(2) { animation-delay: 0.7s; }
+.hack-log li:nth-child(3) { animation-delay: 1.15s; }
+.hack-log li:nth-child(4) { animation-delay: 1.6s; }
+.hack-log li:nth-child(5) { animation-delay: 2.05s; }
+.hack-log li:nth-child(6) { animation-delay: 2.5s; }
+.hack-progress {
+  display: grid;
+  gap: 8px;
+  opacity: 0;
+  counter-reset: pct var(--pct);
+  animation:
+    appear 0.01s 2.9s forwards,
+    count 1.3s 2.9s cubic-bezier(0.6, 0, 0.3, 1) forwards;
+}
+.hack-progress > span:first-child::after {
+  content: ' ' counter(pct) '%';
+  color: var(--hack-pink);
+}
+.hack-bar {
+  height: 14px;
+  border: 1px solid var(--hack-text);
+  padding: 2px;
+}
+.hack-bar span {
+  display: block;
+  height: 100%;
+  background: var(--hack-text);
+  transform-origin: left;
+  transform: scaleX(0);
+  animation: fill 1.3s 2.9s cubic-bezier(0.6, 0, 0.3, 1) forwards;
+}
+.hack-granted {
+  position: relative;
+  margin: 28px 0 0;
+  font: 800 clamp(2.6rem, 13vw, 5rem) / 0.95 var(--display);
+  font-variation-settings: 'wdth' 75;
+  color: #fff;
+  opacity: 0;
+  animation: appear 0.01s 4.3s forwards;
+}
+.hack-granted::before,
+.hack-granted::after {
+  content: attr(data-text);
+  content: attr(data-text) / '';
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: screen;
+}
+.hack-granted::before {
+  color: var(--hack-pink);
+  animation: slice 0.6s 4.3s steps(6) both;
+}
+.hack-granted::after {
+  color: var(--hack-blue);
+  animation: slice 0.6s 4.3s steps(6) reverse both;
+}
+.hack-skip {
+  align-self: center;
+  min-height: 48px;
+  padding: 0 24px;
+  font: inherit;
+  color: var(--hack-text);
+  background: transparent;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  cursor: pointer;
+  position: relative;
+  z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hack {
+    display: none;
+  }
+}
+
+@property --pct {
+  syntax: '<integer>';
+  inherits: false;
+  initial-value: 0;
+}
+@keyframes type {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes appear {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes count {
+  to {
+    --pct: 100;
+  }
+}
+@keyframes fill {
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  15% { transform: translate(-8px, 3px) rotate(-1deg); }
+  30% { transform: translate(7px, -4px) rotate(1deg); }
+  45% { transform: translate(-6px, -2px); }
+  60% { transform: translate(5px, 4px) rotate(0.5deg); }
+  75% { transform: translate(-3px, 1px); }
+  90% { transform: translate(2px, -1px); }
+}
+@keyframes slice {
+  0% { clip-path: inset(0 0 70% 0); transform: translate(-6px, 0); }
+  20% { clip-path: inset(40% 0 30% 0); transform: translate(6px, 0); }
+  40% { clip-path: inset(75% 0 5% 0); transform: translate(-4px, 0); }
+  60% { clip-path: inset(10% 0 60% 0); transform: translate(5px, 0); }
+  80% { clip-path: inset(55% 0 20% 0); transform: translate(-3px, 0); }
+  100% { clip-path: inset(0 0 100% 0); transform: translate(0, 0); }
+}
+@keyframes hack-out {
+  0% { opacity: 1; transform: none; }
+  40% { opacity: 1; transform: scaleY(0.04) scaleX(1.1); }
+  100% { opacity: 0; transform: scaleY(0) scaleX(0); visibility: hidden; }
+}
+
+/* The page itself, revealed once the intro is gone (.tattoo-in) */
+.glitch {
+  position: relative;
+}
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  content: attr(data-text) / '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+.glitch::before {
+  color: var(--pink-ink);
+}
+.glitch::after {
+  color: var(--blue-ink);
+}
 .tattoo-gif {
+  position: relative;
   width: min(280px, 70vw);
-  border-radius: 6px;
   margin: 8px 0 28px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.tattoo-gif img {
+  width: 100%;
+}
+.tattoo-gif::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, rgb(0 0 0 / 0.12) 3px 4px);
 }
 .choice-prompt {
   font-size: 1.3rem;
   margin-top: 40px;
 }
+.prompt-caret {
+  color: var(--pink-ink);
+}
 .choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
 .choice {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
   font: 700 clamp(1.3rem, 3vw, 1.8rem) / 1 var(--display);
   font-variation-settings: 'wdth' 80;
   text-decoration: none;
@@ -621,10 +844,76 @@ p {
   border: 2px solid var(--ink);
   border-radius: 999px;
 }
-.choice:hover {
+.choice-n {
+  font: 600 0.75em ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color: var(--pink-ink);
+}
+.choice:hover,
+.choice:active {
   background: var(--pink);
   border-color: var(--pink);
   color: var(--ink);
+}
+.choice:hover .choice-n,
+.choice:active .choice-n {
+  color: var(--ink);
+}
+@media (max-width: 640px) {
+  .choices {
+    flex-direction: column;
+  }
+  .choice {
+    padding: 18px 22px;
+    border-radius: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tattoo-in {
+    animation: shake 0.45s both;
+  }
+  .tattoo-in .glitch::before {
+    animation: glitch-burst 0.7s steps(5) both, glitch-idle 4s 1.5s steps(4) infinite;
+  }
+  .tattoo-in .glitch::after {
+    animation: glitch-burst 0.7s steps(5) reverse both, glitch-idle 4s 1.6s steps(4) infinite;
+  }
+  .tattoo-in .tattoo-gif,
+  .tattoo-in .lede,
+  .tattoo-in .choice-prompt,
+  .tattoo-in .choices li {
+    animation: rise 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .tattoo-in .tattoo-gif { animation-delay: 0.15s; }
+  .tattoo-in .lede { animation-delay: 0.3s; }
+  .tattoo-in .choice-prompt { animation-delay: 0.45s; }
+  .tattoo-in .choices li { animation-delay: calc(0.6s + var(--i) * 0.12s); }
+  .tattoo-in .prompt-caret {
+    animation: blink 1s steps(1) infinite;
+  }
+  .choice:active {
+    transform: scale(0.98);
+  }
+}
+@keyframes glitch-burst {
+  0% { opacity: 1; clip-path: inset(0 0 65% 0); transform: translate(-5px, 0); }
+  25% { clip-path: inset(45% 0 25% 0); transform: translate(5px, 0); }
+  50% { clip-path: inset(80% 0 0 0); transform: translate(-3px, 0); }
+  75% { clip-path: inset(20% 0 55% 0); transform: translate(4px, 0); }
+  100% { opacity: 0; clip-path: inset(0 0 100% 0); transform: none; }
+}
+/* A short twitch every 4s: idle for most of the cycle */
+@keyframes glitch-idle {
+  0%, 90%, 100% { opacity: 0; transform: none; }
+  92% { opacity: 1; clip-path: inset(30% 0 45% 0); transform: translate(-4px, 0); }
+  95% { opacity: 1; clip-path: inset(65% 0 10% 0); transform: translate(4px, 0); }
+  98% { opacity: 1; clip-path: inset(5% 0 80% 0); transform: translate(-2px, 0); }
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
 }
 
 /* Contact + socials */
