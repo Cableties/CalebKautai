@@ -90,26 +90,26 @@ export const alchemy = {
 // "Find me" — a random spot inside this box (inner Brisbane, stopping short of the bay) on every load.
 export const brisbaneBounds = { south: -27.56, north: -27.38, west: 152.94, east: 153.1 }
 
-// Alien podcast. Add an mp3 path to `audio` (e.g. '/audio/mika.mp3') once the files are moved off Wix.
+// Alien podcast. Originals live in audio-src/; `node scripts/compress-audio.mjs` makes the files in public/audio.
 export const interviews = [
-  { guest: 'Mika', suspect: 'Matt D', length: '22:33', audio: null },
-  { guest: 'Jacob', suspect: 'Tony', length: '13:09', audio: null },
-  { guest: 'Georgia', suspect: 'Jashan', length: '05:19', audio: null },
-  { guest: 'Aidan', suspect: 'Matt D', length: '19:48', audio: null },
-  { guest: 'Tom', suspect: 'Matt D', length: '12:37', audio: null },
-  { guest: 'Matt L', suspect: 'Jason', length: '12:45', audio: null },
-  { guest: 'Nick', suspect: 'Tony', length: '06:32', audio: null },
-  { guest: 'Chris', suspect: 'Matt D', length: '04:58', audio: null },
-  { guest: 'Harriet', suspect: 'Tom', length: '07:33', audio: null },
-  { guest: 'Spandan', suspect: 'Aidan', length: '07:05', audio: null },
-  { guest: 'Matt D', suspect: 'Tony', length: '12:43', audio: null },
-  { guest: 'Ray', suspect: 'Matt D', length: '16:33', audio: null },
-  { guest: 'Kiara', suspect: 'Jason', length: '07:59', audio: null },
-  { guest: 'Pat', suspect: 'Georgia', length: '16:58', audio: null },
-  { guest: 'Tremaine', suspect: 'Thanakon', length: '08:49', audio: null },
-  { guest: 'Will', suspect: 'Tremaine', length: '08:13', audio: null },
-  { guest: 'Jed', suspect: 'Matt D', length: '16:21', audio: null },
-  { guest: 'Caleb', suspect: 'Georgia', length: '26:30', audio: null },
+  { guest: 'Mika', suspect: 'Matt D', length: '22:33', audio: '/audio/mika.m4a' },
+  { guest: 'Jacob', suspect: 'Tony', length: '13:09', audio: '/audio/jacob.m4a' },
+  { guest: 'Georgia', suspect: 'Jashan', length: '05:19', audio: '/audio/georgia.m4a' },
+  { guest: 'Aidan', suspect: 'Matt D', length: '19:48', audio: '/audio/aidan.m4a' },
+  { guest: 'Tom', suspect: 'Matt D', length: '12:37', audio: '/audio/tom.m4a' },
+  { guest: 'Matt L', suspect: 'Jason', length: '12:45', audio: '/audio/matt-lee.m4a' },
+  { guest: 'Nick', suspect: 'Tony', length: '06:32', audio: '/audio/nick.m4a' },
+  { guest: 'Chris', suspect: 'Matt D', length: '04:58', audio: '/audio/chris.m4a' },
+  { guest: 'Harriet', suspect: 'Tom', length: '07:33', audio: '/audio/harriet.m4a' },
+  { guest: 'Spandan', suspect: 'Aidan', length: '07:05', audio: '/audio/spandan.m4a' },
+  { guest: 'Matt D', suspect: 'Tony', length: '12:43', audio: '/audio/matt-d.m4a' },
+  { guest: 'Ray', suspect: 'Matt D', length: '16:33', audio: '/audio/ray.m4a' },
+  { guest: 'Kiara', suspect: 'Jason', length: '07:59', audio: '/audio/kiara.m4a' },
+  { guest: 'Pat', suspect: 'Georgia', length: '16:58', audio: '/audio/pat.m4a' },
+  { guest: 'Tremaine', suspect: 'Thanakon', length: '08:49', audio: '/audio/tremaine.m4a' },
+  { guest: 'Will', suspect: 'Tremaine', length: '08:13', audio: '/audio/will.m4a' },
+  { guest: 'Jed', suspect: 'Matt D', length: '16:21', audio: '/audio/jed.m4a' },
+  { guest: 'Caleb', suspect: 'Georgia', length: '26:30', audio: '/audio/caleb.m4a' },
 ]
 
 export const alienIdentifiers = [

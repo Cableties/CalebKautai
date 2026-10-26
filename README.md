@@ -28,11 +28,14 @@ Add a route in `src/App.jsx` and an entry in `pageMeta` in `src/content.js`. The
 
 To add or replace one, put the original (jpg/png/gif) in `images-src/`, run `node scripts/optimize-images.mjs`, and add it to `images` in `src/content.js` with the width and height the script prints. The script also regenerates `public/og.png`, the preview image shown when the site is shared.
 
+## Podcast audio
+
+Original recordings go in `audio-src/`. `npm run compress-audio` turns them into small mono files in `public/audio/` (named in lowercase with dashes, e.g. `Matt D.m4a` becomes `matt-d.m4a`). Set the interview's `audio` field in `src/content.js` to match. `audio-src/` is too big for git, so it isn't committed: keep your own copy of the originals.
+
 ## Still to do
 
 1. **Application form**: create a free form at [formspree.io](https://formspree.io) and paste its endpoint into `contact.formEndpoint` in `src/content.js`. Until then, submitting opens the visitor's email app instead.
-2. **Podcast audio** isn't migrated. Download the mp3s from the Wix editor, put them in `public/audio/`, and set each interview's `audio` field, e.g. `audio: '/audio/mika.mp3'`. The players appear once any interview has audio.
-3. **Games** and **CoTG** are placeholder pages, hidden from the nav and home page. Their URLs still work.
+2. **Games** and **CoTG** are placeholder pages, hidden from the nav and home page. Their URLs still work.
 
 ## Deploy
 
