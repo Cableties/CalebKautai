@@ -1835,8 +1835,8 @@ a {
 }
 
 /* Good friend page: the bouncing head, as pixel art (BouncingHead.jsx moves it and picks the
-   sprite; --px is the on-screen size of one art pixel). Under the header menu and player, and never
-   in the way of taps. */
+   sprite; --px is the on-screen size of one art pixel). Under the header menu and player. It can
+   be grabbed and thrown, so it catches taps, and dragging it doesn't scroll the page. */
 .bounce-head {
   --px: 2px;
   position: fixed;
@@ -1847,7 +1847,10 @@ a {
   height: calc(var(--h) * var(--px));
   background: var(--sheet) 0 0 / calc(var(--w) * var(--cols) * var(--px)) calc(var(--h) * var(--rows) * var(--px)) no-repeat;
   image-rendering: pixelated;
-  pointer-events: none;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
   will-change: transform;
   /* A one-pixel black outline and a hard, blur-free shadow, in whole art pixels */
   filter: drop-shadow(var(--px) 0 0 #000) drop-shadow(calc(-1 * var(--px)) 0 0 #000) drop-shadow(0 var(--px) 0 #000)
@@ -2687,4 +2690,7 @@ a {
   45% { transform: rotate(8deg); }
   60% { transform: rotate(-4deg); }
   75% { transform: rotate(2deg); }
+}
+.bounce-head.held {
+  cursor: grabbing;
 }

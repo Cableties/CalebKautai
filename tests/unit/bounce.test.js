@@ -95,3 +95,37 @@ test('over ten minutes on a phone screen it stays on screen, keeps bouncing, and
   assert.ok(bounces > 100, `only ${bounces} bounces`)
   assert.equal(used.size, POSES.length, `poses used: ${[...used]}`)
 })
+
+test('a throw sends it off the way it was thrown, capped at the top speed', async () => {
+  const { MAX_THROW, SPEED, release } = await import('../../src/lib/bounce.js')
+  const start = { x: 100, y: 100, travel: 30, facing: 30, squash: 0, speed: SPEED }
+  const right = release(start, 900, 0)
+  assert.ok(close(right.travel, 0) && close(right.speed, 900))
+  const upLeft = release(start, -500, -500)
+  assert.ok(close(upLeft.travel, -135))
+  assert.equal(release(start, 99999, 0).speed, MAX_THROW)
+})
+
+test('letting go gently just carries on at cruising speed, in the same direction', async () => {
+  const { SPEED, release } = await import('../../src/lib/bounce.js')
+  const start = { x: 100, y: 100, travel: 30, facing: 30, squash: 0, speed: SPEED }
+  const after = release(start, 10, 5)
+  assert.equal(after.travel, 30)
+  assert.equal(after.speed, SPEED)
+})
+
+test('a hard throw ricochets around, stays on screen, and slows back to cruising speed', async () => {
+  const { MAX_THROW, SPEED, release } = await import('../../src/lib/bounce.js')
+  const maxX = 390 - 72
+  const maxY = 844 - 96
+  let state = release({ x: 150, y: 400, travel: 0, facing: 0, squash: 0 }, MAX_THROW, -MAX_THROW / 3)
+  let bounces = 0
+  for (let frame = 0; frame < 60 * 8; frame++) {
+    const before = state.squash
+    state = step(state, 1 / 60, maxX, maxY, seeded(3))
+    if (state.squash > before) bounces++
+    assert.ok(state.x >= 0 && state.x <= maxX && state.y >= 0 && state.y <= maxY, `frame ${frame}`)
+  }
+  assert.ok(bounces > 10, `only ${bounces} bounces in the first 8 seconds`)
+  assert.ok(state.speed < SPEED * 1.5, `still going ${state.speed.toFixed(0)}px/s after 8 seconds`)
+})

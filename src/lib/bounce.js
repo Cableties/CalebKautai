@@ -19,7 +19,10 @@ export const POSES = [
 export const TILTS = [-22.5, -11.25, 0, 11.25, 22.5]
 // Sprite sheet frame size in art pixels (the head itself is `art` pixels wide, plus room to tilt)
 export const SPRITE = { art: 32, width: 48, height: 56 }
-export const SPEED = 140 // px per second
+export const SPEED = 140 // px per second: its normal cruising speed
+export const MAX_THROW = 2400 // px per second: the fastest it can be thrown
+const SETTLE = 0.9 // how quickly a thrown head slows back to cruising speed (per second)
+const MIN_THROW = 60 // px per second: let go slower than this and it just carries on bouncing
 export const TURN = 9 // how quickly the face turns toward its direction of travel
 const NUDGE = 20 // random change (degrees) on each bounce, so the angle drifts and every pose gets used
 export const MIN_SLOPE = 15 // keep the path this many degrees off horizontal/vertical, so it never gets stuck
@@ -58,11 +61,21 @@ export function frame(facing) {
   return { row: index, col, mirrored }
 }
 
+// Let go of the head while it's moving at (vx, vy) px per second: it flies off that way, as fast as
+// it was thrown (within MAX_THROW), then slows back to cruising speed. A gentle let-go doesn't
+// count as a throw; it just carries on as it was.
+export function release(state, vx, vy) {
+  const speed = Math.hypot(vx, vy)
+  if (speed < MIN_THROW) return { ...state, speed: SPEED }
+  const travel = (Math.atan2(vy, vx) * 180) / Math.PI
+  return { ...state, travel, speed: Math.min(MAX_THROW, Math.max(SPEED, speed)) }
+}
+
 // One frame of movement inside a box of maxX × maxY. Returns the new state.
 export function step(state, dt, maxX, maxY, random = Math.random) {
-  let { x, y, travel, facing, squash } = state
-  x += Math.cos(toRad(travel)) * SPEED * dt
-  y += Math.sin(toRad(travel)) * SPEED * dt
+  let { x, y, travel, facing, squash, speed = SPEED } = state
+  x += Math.cos(toRad(travel)) * speed * dt
+  y += Math.sin(toRad(travel)) * speed * dt
   let bounced = false
   if (x <= 0 || x >= maxX) {
     travel = normalise(180 - travel)
@@ -80,5 +93,7 @@ export function step(state, dt, maxX, maxY, random = Math.random) {
   }
   facing = normalise(facing + normalise(travel - facing) * (1 - Math.exp(-TURN * dt)))
   squash *= Math.exp(-10 * dt)
-  return { x, y, travel, facing, squash }
+  // A thrown head eases back down to cruising speed
+  speed = SPEED + (speed - SPEED) * Math.exp(-SETTLE * dt)
+  return { x, y, travel, facing, squash, speed }
 }

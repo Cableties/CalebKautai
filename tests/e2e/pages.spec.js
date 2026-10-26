@@ -68,7 +68,7 @@ test('find me shows coordinates and a map', async ({ page }) => {
 })
 
 test.describe('bouncing head on the good friend page', () => {
-  test('bounces around without getting in the way of taps', async ({ page }) => {
+  test('bounces around, drawn as crisp pixel art', async ({ page }) => {
     await page.goto('/tattoo-good-friend')
     const head = page.locator('.bounce-head')
     await expect(head).toBeAttached()
@@ -89,8 +89,8 @@ test.describe('bouncing head on the good friend page', () => {
       expect(Number.isInteger(row) && row >= 0 && row < POSES.length, `row ${row}`).toBe(true)
       await page.waitForTimeout(100)
     }
-    // Taps pass straight through it to whatever is underneath
-    expect(await head.evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none')
+    // Dragging it moves the head rather than scrolling the page
+    expect(await head.evaluate((el) => getComputedStyle(el).touchAction)).toBe('none')
   })
 
   test('moves smoothly, on every frame', async ({ page }) => {
@@ -116,6 +116,34 @@ test.describe('bouncing head on the good friend page', () => {
     // Snapping to the art's 2–3px grid used to freeze it on some frames and jump on others
     const frozen = steps.filter((s) => s < 0.5).length
     expect(frozen, `${frozen} of ${steps.length} frames without movement`).toBeLessThanOrEqual(steps.length * 0.05)
+  })
+
+  test('can be grabbed, carried and thrown', async ({ page }) => {
+    await page.goto('/tattoo-good-friend')
+    const head = page.locator('.bounce-head')
+    await page.waitForTimeout(400)
+    const position = () => head.evaluate((el) => { const m = new DOMMatrix(getComputedStyle(el).transform); return [m.e, m.f] })
+    // Grab it where it is right now, and carry it to the middle of the left side
+    const box = await head.boundingBox()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    const view = page.viewportSize()
+    await page.mouse.move(60, view.height / 2, { steps: 10 })
+    // While held it stays with the pointer
+    const [heldX] = await position()
+    await page.waitForTimeout(300)
+    expect(Math.abs((await position())[0] - heldX)).toBeLessThan(2)
+    // Fling it right, fast, and let go mid-swing
+    for (let i = 1; i <= 6; i++) {
+      await page.mouse.move(60 + i * 40, view.height / 2)
+      await page.waitForTimeout(10)
+    }
+    await page.mouse.up()
+    const [x0] = await position()
+    await page.waitForTimeout(150)
+    const [x1] = await position()
+    // Far faster than its 140px/s cruise (which would cover ~21px in that time)
+    expect(Math.abs(x1 - x0)).toBeGreaterThan(60)
   })
 
   test('is left out for reduced motion', async ({ page }) => {
