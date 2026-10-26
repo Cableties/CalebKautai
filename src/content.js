@@ -127,6 +127,16 @@ export const thingsToDo = [
 		note: "Interviews with people who may not be people.",
 	},
 	{
+		to: "/tattoo-good-friend",
+		label: "Friendship quiz",
+		note: "How well do you really know me? Bring your drawing skills.",
+	},
+	{
+		to: "/cheat-codes",
+		label: "Cheat codes",
+		note: "Head Mode, Dance Mode, Australia Mode… use responsibly.",
+	},
+	{
 		to: "/find-me",
 		label: "Find me",
 		note: "Real-time tracking. Totally real.",
