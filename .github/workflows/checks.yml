@@ -9,7 +9,8 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    # Pinned: since ubuntu-latest moved to a newer Ubuntu, installing the test browsers there has hung
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -28,6 +29,7 @@ jobs:
         run: npm run test:unit
 
       - name: Install test browsers
+        timeout-minutes: 5 # fail fast if it hangs, instead of using up the whole job
         run: npx playwright install --with-deps chromium webkit
 
       - name: Browser tests
