@@ -142,6 +142,12 @@ export const games = [
 		icon: "🔨",
 		note: "My head pops up. You bonk it. 30 seconds.",
 	},
+	{
+		to: "/games/pinball",
+		label: "Pinball",
+		icon: "🕹️",
+		note: "I'm the ball. Four tables: Classic, Mainframe, Close Encounters and Dance Floor.",
+	},
 ];
 
 export const thingsToDo = [
@@ -173,7 +179,7 @@ export const thingsToDo = [
 	{
 		to: "/games",
 		label: "Games",
-		note: "Flappy Head and Bonk. Get your initials on the high scores.",
+		note: "Flappy Head, Bonk and pinball. Get your initials on the high scores.",
 	},
 	{
 		to: "/find-me",
@@ -238,6 +244,10 @@ export const pageMeta = {
 	"/games/flappy-head": {
 		title: "Flappy Head",
 		description: "Flap Caleb's pixel head through the pipes. How far can you get?",
+	},
+	"/games/pinball": {
+		title: "Pinball",
+		description: "Pinball on four themed tables, with Caleb's pixel head as the ball.",
 	},
 	"/games/bonk": {
 		title: "Bonk",

@@ -3345,17 +3345,7 @@ a {
   opacity: 0.6;
 }
 
-/* ---------- Games (pages/Games.jsx, FlappyHead.jsx, Bonk.jsx, components/Scores.jsx) ---------- */
-/* Two games side by side, without the home page's "last card fills the row" rule */
-@media (min-width: 700px) {
-  .games .cards {
-    grid-template-columns: repeat(2, 1fr);
-    max-width: 860px;
-  }
-  .games .cards li:last-child:nth-child(n) {
-    grid-column: auto;
-  }
-}
+/* ---------- Games (pages/Games.jsx, FlappyHead.jsx, Bonk.jsx, Pinball.jsx, components/Scores.jsx) ---------- */
 .game-card-icon {
   font-size: 2rem;
   line-height: 1;
@@ -3610,6 +3600,60 @@ a {
 }
 .bonk .game-overlay {
   border-radius: 17px;
+}
+/* Pinball: pick a table, each in its own colours */
+.pinball-tables {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.pinball-tables button {
+  min-height: 40px;
+  padding: 0 16px;
+  font: 600 0.95rem/1 var(--body);
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.pinball-tables button[aria-checked='true'] {
+  color: #fff;
+  border-color: transparent;
+}
+.pinball-tables .pinball-table-classic[aria-checked='true'] {
+  background: #c2407e;
+}
+.pinball-tables .pinball-table-mainframe[aria-checked='true'] {
+  color: #7dffb2;
+  background: #0d0c16;
+}
+.pinball-tables .pinball-table-space[aria-checked='true'] {
+  background: linear-gradient(135deg, #0b1030, #4a2f80);
+}
+.pinball-tables .pinball-table-disco[aria-checked='true'] {
+  background: linear-gradient(90deg, #e0559a, #f2a541, #3a8fd0, #8a5cd6);
+}
+/* Pinball: the score line sits above the table, so the table is a little shorter */
+.pinball-stage {
+  width: min(100%, calc((100dvh - 150px) * 9 / 16), 420px);
+  touch-action: none; /* two thumbs on the flippers, not zooming or scrolling */
+}
+.pinball-hud {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: min(100%, calc((100dvh - 150px) * 9 / 16), 420px);
+  margin: 0 auto 8px;
+  font-size: 1.05rem;
+}
+.pinball-hud strong {
+  font-variant-numeric: tabular-nums;
+}
+.pinball-multiplier {
+  font-weight: 800;
+  color: var(--pink-ink);
 }
 @media (prefers-reduced-motion: reduce) {
   .game-overlay-hint p,

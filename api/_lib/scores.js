@@ -4,6 +4,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { MAX_SCORE as BONK_MAX, ROUND_MS } from '../../src/lib/bonk.js'
 import { SECONDS_PER_PIPE } from '../../src/lib/flappy.js'
+import { POINTS_PER_SECOND, TABLES } from '../../src/lib/pinball.js'
 
 const HOUR = 60 * 60 * 1000
 export const GAMES = {
@@ -11,6 +12,10 @@ export const GAMES = {
   'flappy-head': { minMs: (score) => score * SECONDS_PER_PIPE * 1000 * 0.9, max: 10_000 },
   // A fixed-length round
   bonk: { minMs: (score) => (score ? ROUND_MS * 0.95 : 0), max: BONK_MAX },
+  // A board per pinball table, none faster than a ball pinging between bumpers non-stop
+  ...Object.fromEntries(
+    TABLES.map((t) => [`pinball-${t.id}`, { minMs: (score) => (score / POINTS_PER_SECOND) * 1000, max: 10_000_000 }]),
+  ),
 }
 export const TOP = 10 // shown on the board
 export const KEPT = 100 // stored per game

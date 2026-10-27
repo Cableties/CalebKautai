@@ -14,6 +14,7 @@ import Bonk from './pages/Bonk.jsx'
 import FlappyHead from './pages/FlappyHead.jsx'
 import Games from './pages/Games.jsx'
 import GuestbookAdmin from './pages/GuestbookAdmin.jsx'
+import Pinball from './pages/Pinball.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import NotFound from './pages/NotFound.jsx'
 
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="games" element={<Games />} />
         <Route path="games/flappy-head" element={<FlappyHead />} />
         <Route path="games/bonk" element={<Bonk />} />
+        <Route path="games/pinball" element={<Pinball />} />
         <Route path="cotg-submission" element={<Placeholder title="CoTG" blurb="Submissions aren't open yet. When they are, this is where they'll go." />} />
         <Route path="*" element={<NotFound />} />
       </Route>
