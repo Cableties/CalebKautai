@@ -2042,6 +2042,17 @@ a {
     --disco: 360;
   }
 }
+/* The bouncing head (and Head Trail's little heads) dance too: tinted to the same turning hue, with
+   the outline in the accent ink. Sepia first makes every pixel one hue (about 40°), so turning it
+   by --disco lines it up with the rest of the palette. */
+:root[data-cheat-dance] .bounce-head {
+  filter: sepia(1) saturate(3) hue-rotate(calc((var(--disco) - 40) * 1deg)) drop-shadow(var(--px) 0 0 var(--pink-ink))
+    drop-shadow(calc(-1 * var(--px)) 0 0 var(--pink-ink)) drop-shadow(0 var(--px) 0 var(--pink-ink))
+    drop-shadow(0 calc(-1 * var(--px)) 0 var(--pink-ink)) drop-shadow(calc(2 * var(--px)) calc(2 * var(--px)) 0 rgb(0 0 0 / 0.35));
+}
+:root[data-cheat-dance] .head-trail {
+  filter: sepia(1) saturate(3) hue-rotate(calc((var(--disco) - 40) * 1deg));
+}
 
 /* Australia Mode: the whole site upside down. The page scrolls inside #root (fixed to the screen),
    so the player, pop-ups and bouncing head flip with it instead of escaping to the right way up. */

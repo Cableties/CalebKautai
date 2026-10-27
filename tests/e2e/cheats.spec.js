@@ -50,6 +50,20 @@ test('Dance Mode cycles the colours', async ({ page }) => {
   await expect.poll(colour, { timeout: 5000 }).not.toBe(first)
 })
 
+test('Dance Mode changes the bouncing head colours along with everything else', async ({ page }) => {
+  await openCheats(page)
+  await toggleCheat(page, 'Head Mode')
+  const filter = () => page.locator('.bounce-head').evaluate((el) => getComputedStyle(el).filter)
+  expect(await filter()).not.toContain('hue-rotate')
+  await toggleCheat(page, 'Dance Mode')
+  await expect.poll(filter).toContain('hue-rotate')
+  const first = await filter()
+  await expect.poll(filter, { timeout: 5000 }).not.toBe(first)
+  // Back to its own colours once Dance Mode is off
+  await toggleCheat(page, 'Dance Mode')
+  await expect.poll(filter).not.toContain('hue-rotate')
+})
+
 test('Australia Mode turns the site upside down, and links still work', async ({ page }) => {
   await openCheats(page)
   await toggleCheat(page, 'Australia Mode')
