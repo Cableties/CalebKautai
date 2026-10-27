@@ -32,6 +32,7 @@ export const test = base.extend({
         reviews: { count: 2, average: 4.5, reviews: [] },
         reviewStatus: 201,
         reviewBody: { approved: false },
+        reviewPosts: [],
         down: false,
       }
       await page.route('**/api/scans', (route) => {
@@ -44,9 +45,9 @@ export const test = base.extend({
       })
       await page.route('**/api/reviews', (route) => {
         if (api.down) return route.fulfill({ status: 503, json: { error: 'Storage is not configured' } })
-        return route.request().method() === 'POST'
-          ? route.fulfill({ status: api.reviewStatus, json: api.reviewBody })
-          : route.fulfill({ json: api.reviews })
+        if (route.request().method() !== 'POST') return route.fulfill({ json: api.reviews })
+        api.reviewPosts.push(route.request().postDataJSON())
+        return route.fulfill({ status: api.reviewStatus, json: api.reviewBody })
       })
       await page.route('https://formspree.io/**', (route) => route.fulfill({ json: { ok: true } }))
       await page.route('https://www.google.com/maps**', (route) =>

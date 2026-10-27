@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { oldReviews } from "../content.js";
+import DoodlePad, { Doodle } from "./DoodlePad.jsx";
 
 const LIMITS = { name: 40, comment: 280 }; // matches api/_lib/reviews.js
 
@@ -21,6 +22,9 @@ const day = (iso) =>
 		timeZone: "UTC",
 	});
 
+// Entries from before the rename were saved as "Anonymous victim"
+const displayName = (name) => (name === "Anonymous victim" ? "Anonymous" : name);
+
 // The old site's ratings count towards the average alongside the API's
 function combine(data) {
 	const count = (data?.count ?? 0) + oldReviews.length;
@@ -30,72 +34,90 @@ function combine(data) {
 	return { count, average: Math.round((total / count) * 10) / 10 };
 }
 
+// The guestbook: stars, a comment, a doodle, or any mix of them
 export default function Reviews() {
 	// null while loading or if the API isn't available; old reviews show either way
 	const [data, setData] = useState(null);
 	const [rating, setRating] = useState(0);
 	const [hover, setHover] = useState(0);
-	const [status, setStatus] = useState("idle"); // idle | sending | approved | pending | error
+	const [doodle, setDoodle] = useState([]);
+	const [status, setStatus] = useState("idle"); // idle | sending | sent | error
+	const [sent, setSent] = useState(null); // what went, for the thank-you message
 	const [error, setError] = useState("");
 
-	useEffect(() => {
+	const load = () =>
 		fetch("/api/reviews")
 			.then((r) => (r.ok ? r.json() : Promise.reject()))
 			.then(setData)
 			.catch(() => setData(null));
+	useEffect(() => {
+		load();
 	}, []);
 
 	async function submit(e) {
 		e.preventDefault();
-		if (!rating) {
+		const form = Object.fromEntries(new FormData(e.currentTarget));
+		if (!rating && !form.comment.trim() && !doodle.length) {
 			setStatus("error");
-			setError("Pick how many stars first.");
+			setError("Leave some stars, a comment or a doodle first.");
 			return;
 		}
-		const form = new FormData(e.currentTarget);
 		setStatus("sending");
 		try {
 			const res = await fetch("/api/reviews", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ rating, ...Object.fromEntries(form) }),
+				body: JSON.stringify({ ...form, rating: rating || null, doodle }),
 			});
 			const body = await res.json().catch(() => ({}));
-			// 404: no API at all (local dev); 503: the database isn't connected yet
-			if (res.status === 404 || res.status === 503)
-				throw new Error("Reviews aren't switched on yet. Try again soon!");
+			// 404: no API at all (local dev); 503 with this message: the database isn't connected yet
+			if (
+				res.status === 404 ||
+				(res.status === 503 && body.error === "Storage is not configured")
+			)
+				throw new Error("The guestbook isn't switched on yet. Try again soon!");
 			if (!res.ok)
 				throw new Error(body.error || "That didn't send. Try again in a bit.");
-			setStatus(body.approved ? "approved" : "pending");
+			setSent({ approved: body.approved, rated: !!rating });
+			setStatus("sent");
 			// Refresh the average (and the list, if it went straight up)
-			fetch("/api/reviews")
-				.then((r) => r.json())
-				.then(setData)
-				.catch(() => {});
+			load();
 		} catch (err) {
 			setStatus("error");
 			setError(err.message);
 		}
 	}
 
-	const sent = status === "approved" || status === "pending";
 	const summary = combine(data);
+	const thanks = !sent
+		? ""
+		: sent.approved
+			? "Thanks! You're in the guestbook."
+			: sent.rated
+				? "Thanks! Your stars are in, and the rest will show up once I've had a look."
+				: "Thanks! It'll show up once I've had a look.";
 
 	return (
 		<section className="reviews" aria-labelledby="reviews-heading">
+			<p className="reviews-kicker" aria-hidden="true">
+				&gt; guestbook
+			</p>
 			<h2 id="reviews-heading" className="section-title">
-				Rate your experience
+				Sign the guestbook
 			</h2>
+			<p className="reviews-lede">
+				Rate the experience, leave a note, or draw me something. Or all three.
+			</p>
 			<p className="reviews-summary">
 				<Stars rating={summary.average} />{" "}
 				<strong>{summary.average.toFixed(1)}</strong> from {summary.count}{" "}
 				{summary.count === 1 ? "rating" : "ratings"}
 			</p>
 
-			{!sent && (
+			{status !== "sent" ? (
 				<form className="review-form" onSubmit={submit}>
 					<fieldset className="star-input" onMouseLeave={() => setHover(0)}>
-						<legend>Your rating</legend>
+						<legend>Your rating (optional)</legend>
 						{[1, 2, 3, 4, 5].map((n) => (
 							<label
 								key={n}
@@ -123,13 +145,21 @@ export default function Reviews() {
 							name="name"
 							maxLength={LIMITS.name}
 							autoComplete="nickname"
-							placeholder="Anonymous victim"
+							placeholder="Anonymous"
 						/>
 					</label>
 					<label className="review-comment">
 						<span>Comment (optional)</span>
 						<textarea name="comment" maxLength={LIMITS.comment} rows={3} />
 					</label>
+					<fieldset className="review-doodle">
+						<legend>Doodle (optional)</legend>
+						<DoodlePad
+							strokes={doodle}
+							onChange={setDoodle}
+							disabled={status === "sending"}
+						/>
+					</fieldset>
 					{/* Honeypot: hidden from people, filled in by spam bots */}
 					<label className="visually-hidden" aria-hidden="true">
 						Website
@@ -140,7 +170,7 @@ export default function Reviews() {
 						className="button"
 						disabled={status === "sending"}
 					>
-						{status === "sending" ? "Sending…" : "Submit review"}
+						{status === "sending" ? "Sending…" : "Sign the guestbook"}
 					</button>
 					{status === "error" && (
 						<p className="notice" role="alert">
@@ -148,12 +178,9 @@ export default function Reviews() {
 						</p>
 					)}
 				</form>
-			)}
-			{sent && (
+			) : (
 				<p className="notice" role="status">
-					{status === "approved"
-						? "Thanks! Your rating is in."
-						: "Thanks! Your rating is in, and your comment will show up once I've read it."}
+					{thanks}
 				</p>
 			)}
 
@@ -161,8 +188,12 @@ export default function Reviews() {
 				{data?.reviews?.map((r) => (
 					<li key={r.id}>
 						<p className="review-head">
-							<strong>{r.name}</strong> <Stars rating={r.rating} />
+							<strong>{displayName(r.name)}</strong>{" "}
+							{r.rating > 0 && <Stars rating={r.rating} />}
 						</p>
+						{r.doodle?.length > 0 && (
+							<Doodle strokes={r.doodle} label={`Doodle by ${displayName(r.name)}`} />
+						)}
 						{r.comment && <p>{r.comment}</p>}
 						<p className="review-date">{day(r.createdAt)}</p>
 					</li>

@@ -217,6 +217,11 @@ export const pageMeta = {
 		title: "CoTG",
 		description: "Submissions aren't open yet.",
 	},
+	// Not linked anywhere: opened from guestbook emails (pages/GuestbookAdmin.jsx)
+	"/guestbook-admin": {
+		title: "Guestbook admin",
+		description: "Approve guestbook entries.",
+	},
 	"/decision-wheel": {
 		title: "Decision wheel",
 		description: "Can't decide? Put in the options, weight them, and spin.",

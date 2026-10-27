@@ -58,7 +58,8 @@ export default function Layout() {
               {menuOpen ? 'Close' : 'Menu'}
             </button>
           </div>
-          <nav id="site-nav" aria-label="Main" className={menuOpen ? 'open' : ''}>
+          {/* Picking a page closes the menu straight away, not once the new page has loaded */}
+          <nav id="site-nav" aria-label="Main" className={menuOpen ? 'open' : ''} onClick={(e) => e.target.closest('a') && setMenuOpen(false)}>
             <ul>
               {nav.map((item) =>
                 item.items ? (
@@ -136,7 +137,7 @@ function NavGroup({ group }) {
         {group.label}
         <span className="nav-caret" aria-hidden="true" />
       </button>
-      <ul id={id} hidden={!open}>
+      <ul id={id} hidden={!open} onClick={(e) => e.target.closest('a') && setOpen(false)}>
         {group.items.map((item) => (
           <li key={item.to}>
             <NavLink to={item.to} viewTransition>
