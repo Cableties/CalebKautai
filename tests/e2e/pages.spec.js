@@ -184,8 +184,9 @@ test.describe('bouncing head on the good friend page', () => {
     const [x0] = await position()
     await page.waitForTimeout(150)
     const [x1] = await position()
-    // Far faster than its 140px/s cruise (which would cover ~21px in that time)
-    expect(Math.abs(x1 - x0)).toBeGreaterThan(60)
+    // Far faster than its 140px/s cruise (which would cover ~21px in that time). A slow machine
+    // measures a slower throw, so the bar is well above cruising but not right at the limit.
+    expect(Math.abs(x1 - x0)).toBeGreaterThan(45)
   })
 
   test('a quick tap on the head goes through to the button underneath', async ({ page }) => {

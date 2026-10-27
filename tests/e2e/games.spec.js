@@ -95,7 +95,7 @@ test.describe("Pinball", () => {
 		await expect(hud).toContainText("Score 0");
 	});
 
-	test("tables can be swapped, each with its own word and high scores", async ({
+	test("tables can be swapped, each with its own high scores", async ({
 		page,
 		api,
 	}) => {
@@ -110,7 +110,6 @@ test.describe("Pinball", () => {
 		).toBeVisible();
 		await tables.getByRole("radio", { name: "Close Encounters" }).click();
 		await expect(page).toHaveURL("/games/pinball?table=space");
-		await expect(page.getByText("Light up U-F-O for a bonus.")).toBeVisible();
 		await expect(
 			page.getByRole("region", { name: "High scores" }),
 		).toContainText("ET");
@@ -122,13 +121,14 @@ test.describe("Pinball", () => {
 		await expect(
 			tables.getByRole("radio", { name: "Close Encounters" }),
 		).toHaveAttribute("aria-checked", "true");
-		for (const [name, word] of [
-			["Mainframe", "H-A-C-K"],
-			["Dance Floor", "D-I-S-C-O"],
-		]) {
+		for (const name of ["Mainframe", "Dance Floor"]) {
 			await tables.getByRole("radio", { name }).click();
+			await expect(tables.getByRole("radio", { name })).toHaveAttribute(
+				"aria-checked",
+				"true",
+			);
 			await expect(
-				page.getByText(`Light up ${word} for a bonus.`),
+				page.getByRole("img", { name: new RegExp(`${name} pinball table`) }),
 			).toBeVisible();
 		}
 	});
