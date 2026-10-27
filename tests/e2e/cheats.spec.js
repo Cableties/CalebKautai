@@ -46,8 +46,8 @@ test('Dance Mode cycles the colours', async ({ page }) => {
   await toggleCheat(page, 'Dance Mode')
   const colour = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--pink').trim())
   const first = await colour()
-  await page.waitForTimeout(700)
-  expect(await colour()).not.toBe(first)
+  // A slow machine can drop frames, so give it a few seconds to move on
+  await expect.poll(colour, { timeout: 5000 }).not.toBe(first)
 })
 
 test('Australia Mode turns the site upside down, and links still work', async ({ page }) => {

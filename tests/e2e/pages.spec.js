@@ -164,8 +164,15 @@ test.describe('bouncing head on the good friend page', () => {
     await grabHead(page)
     const view = page.viewportSize()
     await page.mouse.move(60, view.height / 2, { steps: 10 })
-    // While held it stays with the pointer
-    const [heldX] = await position()
+    // While held it stays with the pointer. A slow browser can still be catching up on the drag's
+    // last few moves, so wait until it's settled first.
+    let heldX
+    await expect(async () => {
+      const [before] = await position()
+      await page.waitForTimeout(100)
+      heldX = (await position())[0]
+      expect(Math.abs(heldX - before)).toBeLessThan(1)
+    }).toPass()
     await page.waitForTimeout(300)
     expect(Math.abs((await position())[0] - heldX)).toBeLessThan(2)
     // Fling it right, fast, and let go mid-swing

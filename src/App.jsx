@@ -10,6 +10,9 @@ import LoveInterest from './pages/LoveInterest.jsx'
 import Aliens from './pages/Aliens.jsx'
 import CheatCodes from './pages/CheatCodes.jsx'
 import DecisionWheel from './pages/DecisionWheel.jsx'
+import Bonk from './pages/Bonk.jsx'
+import FlappyHead from './pages/FlappyHead.jsx'
+import Games from './pages/Games.jsx'
 import GuestbookAdmin from './pages/GuestbookAdmin.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import NotFound from './pages/NotFound.jsx'
@@ -31,7 +34,9 @@ export default function App() {
         <Route path="cheat-codes" element={<CheatCodes />} />
         <Route path="decision-wheel" element={<DecisionWheel />} />
         <Route path="guestbook-admin" element={<GuestbookAdmin />} />
-        <Route path="games" element={<Placeholder title="Games" blurb="The games are being rebuilt from scratch. Check back soon, or go bother an alien in the meantime." />} />
+        <Route path="games" element={<Games />} />
+        <Route path="games/flappy-head" element={<FlappyHead />} />
+        <Route path="games/bonk" element={<Bonk />} />
         <Route path="cotg-submission" element={<Placeholder title="CoTG" blurb="Submissions aren't open yet. When they are, this is where they'll go." />} />
         <Route path="*" element={<NotFound />} />
       </Route>

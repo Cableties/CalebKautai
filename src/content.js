@@ -120,12 +120,29 @@ export const nav = [
 			{ to: "/aliens", label: "Aliens!" },
 			{ to: "/cheat-codes", label: "Cheat codes" },
 			{ to: "/decision-wheel", label: "Decision wheel" },
+			{ to: "/games", label: "Games" },
 		],
 	},
 ];
 
 export const intro =
 	"Software engineer in Brisbane. Makes weird stuff on the side.";
+
+// The games page (pages/Games.jsx)
+export const games = [
+	{
+		to: "/games/flappy-head",
+		label: "Flappy Head",
+		icon: "🐤",
+		note: "Tap to flap. Don't touch the pipes.",
+	},
+	{
+		to: "/games/bonk",
+		label: "Bonk",
+		icon: "🔨",
+		note: "My head pops up. You bonk it. 30 seconds.",
+	},
+];
 
 export const thingsToDo = [
 	{
@@ -152,6 +169,11 @@ export const thingsToDo = [
 		to: "/decision-wheel",
 		label: "Decision wheel",
 		note: "Can't decide? Let the wheel do it. Weighted, obviously.",
+	},
+	{
+		to: "/games",
+		label: "Games",
+		note: "Flappy Head and Bonk. Get your initials on the high scores.",
 	},
 	{
 		to: "/find-me",
@@ -211,7 +233,15 @@ export const pageMeta = {
 	},
 	"/games": {
 		title: "Games",
-		description: "The games are being rebuilt. Check back soon.",
+		description: "Quick games starring Caleb's head, with high scores.",
+	},
+	"/games/flappy-head": {
+		title: "Flappy Head",
+		description: "Flap Caleb's pixel head through the pipes. How far can you get?",
+	},
+	"/games/bonk": {
+		title: "Bonk",
+		description: "Caleb's head pops up. You bonk it. 30 seconds.",
 	},
 	"/cotg-submission": {
 		title: "CoTG",

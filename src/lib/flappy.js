@@ -1,0 +1,76 @@
+// The rules of Flappy Head (pages/FlappyHead.jsx), kept free of the DOM so they can be unit tested.
+// The world is a fixed WIDTH × HEIGHT box in its own units; the page scales it to fit the screen.
+// The head stays at HEAD_X while the pipes scroll past; y grows downwards.
+export const WIDTH = 360
+export const HEIGHT = 640
+export const GROUND = 56 // height of the ground strip at the bottom
+export const HEAD_X = 96
+export const RADIUS = 17 // the head's hitbox; Big Head Mode doubles it
+export const GRAVITY = 1500 // units per second²
+export const FLAP = -470 // upward speed right after a flap
+export const MAX_FALL = 720
+export const SPEED = 150 // how fast the pipes scroll
+export const PIPE_WIDTH = 66
+export const SPACING = 220 // from one pipe to the next
+const GAP = { start: 176, min: 136, shrink: 2 } // the opening narrows by `shrink` per point
+const EDGE = 64 // keep openings at least this far from the top and the ground
+
+// Seconds between pipes, so the server can tell a real score from a made-up one
+export const SECONDS_PER_PIPE = SPACING / SPEED
+
+export const gapFor = (score) => Math.max(GAP.min, GAP.start - score * GAP.shrink)
+
+export function pipe(x, score, random = Math.random) {
+  const gap = gapFor(score)
+  const top = EDGE + gap / 2
+  const bottom = HEIGHT - GROUND - EDGE - gap / 2
+  return { x, gapY: top + random() * (bottom - top), gap, scored: false }
+}
+
+export function start({ radius = RADIUS } = {}, random = Math.random) {
+  return { y: HEIGHT * 0.42, vy: 0, radius, score: 0, dead: false, pipes: [pipe(WIDTH + 80, 0, random)] }
+}
+
+export const flap = (state) => (state.dead ? state : { ...state, vy: FLAP })
+
+// Does a circle at (cx, cy) touch the rectangle from (x, y) to (x + w, y + h)?
+export function hits(cx, cy, r, x, y, w, h) {
+  const nx = Math.max(x, Math.min(cx, x + w))
+  const ny = Math.max(y, Math.min(cy, y + h))
+  return (cx - nx) ** 2 + (cy - ny) ** 2 < r * r
+}
+
+// One frame. Returns the new state; `dead` once it hits a pipe or the ground.
+export function step(state, dt, random = Math.random) {
+  if (state.dead) return state
+  const vy = Math.min(MAX_FALL, state.vy + GRAVITY * dt)
+  // The sky has a lid: bumping it stops the climb rather than ending the game
+  let y = state.y + vy * dt
+  const ceiling = state.radius
+  const climbing = y < ceiling
+  if (climbing) y = ceiling
+  let score = state.score
+  let pipes = state.pipes
+    .map((p) => ({ ...p, x: p.x - SPEED * dt }))
+    .filter((p) => p.x + PIPE_WIDTH > -10)
+    .map((p) => {
+      if (p.scored || p.x + PIPE_WIDTH >= HEAD_X - state.radius) return p
+      score++
+      return { ...p, scored: true }
+    })
+  const last = pipes.at(-1)
+  if (!last || last.x <= WIDTH - SPACING) pipes = [...pipes, pipe((last?.x ?? WIDTH) + SPACING, score, random)]
+
+  const r = state.radius
+  const crashed =
+    y + r >= HEIGHT - GROUND ||
+    pipes.some(
+      (p) =>
+        hits(HEAD_X, y, r, p.x, -1000, PIPE_WIDTH, p.gapY - p.gap / 2 + 1000) ||
+        hits(HEAD_X, y, r, p.x, p.gapY + p.gap / 2, PIPE_WIDTH, HEIGHT),
+    )
+  return { ...state, y: crashed ? Math.min(y, HEIGHT - GROUND - r) : y, vy: climbing ? 0 : vy, score, pipes, dead: crashed }
+}
+
+// Which way the face points (degrees, 0 = right, 90 = down): nose up after a flap, down in a dive
+export const facing = (vy) => Math.max(-45, Math.min(70, (Math.atan2(vy, SPEED * 2) * 180) / Math.PI))

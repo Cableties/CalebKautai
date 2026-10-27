@@ -33,6 +33,9 @@ export const test = base.extend({
         reviewStatus: 201,
         reviewBody: { approved: false },
         reviewPosts: [],
+        scores: { 'flappy-head': [], bonk: [] },
+        scorePosts: [],
+        scoreStatus: 201,
         down: false,
       }
       await page.route('**/api/scans', (route) => {
@@ -48,6 +51,18 @@ export const test = base.extend({
         if (route.request().method() !== 'POST') return route.fulfill({ json: api.reviews })
         api.reviewPosts.push(route.request().postDataJSON())
         return route.fulfill({ status: api.reviewStatus, json: api.reviewBody })
+      })
+      await page.route('**/api/scores**', (route) => {
+        if (api.down) return route.fulfill({ status: 503, json: { error: 'Storage is not configured' } })
+        const req = route.request()
+        if (req.method() === 'GET') return route.fulfill({ json: { scores: api.scores[new URL(req.url()).searchParams.get('game')] } })
+        const body = req.postDataJSON()
+        if (body.action === 'start') return route.fulfill({ json: { run: `run-${body.game}` } })
+        api.scorePosts.push(body)
+        if (api.scoreStatus !== 201) return route.fulfill({ status: api.scoreStatus, json: { error: "That score doesn't look right." } })
+        api.scores[body.game] = [...api.scores[body.game], { initials: body.initials, score: body.score }].sort((a, b) => b.score - a.score)
+        const rank = api.scores[body.game].findIndex((s) => s.initials === body.initials && s.score === body.score) + 1
+        return route.fulfill({ status: 201, json: { rank, scores: api.scores[body.game] } })
       })
       await page.route('https://formspree.io/**', (route) => route.fulfill({ json: { ok: true } }))
       await page.route('https://www.google.com/maps**', (route) =>
