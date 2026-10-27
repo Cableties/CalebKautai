@@ -1,5 +1,5 @@
 import { CHEATS } from '../../src/components/Cheats.jsx'
-import { expect, openNav, test } from './fixtures.js'
+import { expect, openNav, openNavGroup, test } from './fixtures.js'
 
 const html = (page) => page.locator('html')
 const cheatSwitch = (page, name) => page.getByRole('switch', { name, exact: true })
@@ -7,7 +7,7 @@ const toggleCheat = (page, name) => cheatSwitch(page, name).click()
 
 async function openCheats(page) {
   await page.goto('/')
-  await openNav(page)
+  await openNavGroup(page, 'Fun stuff')
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Cheat codes' }).click()
   await expect(page.getByRole('heading', { name: 'Cheat codes', level: 1 })).toBeVisible()
 }
@@ -142,7 +142,7 @@ test('Gravity Mode knocks things off the page instead of following links, and ti
   await page.getByRole('link', { name: 'More on GitHub' }).click()
   await expect(page).toHaveURL('/work')
   // The header still works, to get back to the switches
-  await openNav(page)
+  await openNavGroup(page, 'Fun stuff')
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Cheat codes' }).click()
   await toggleCheat(page, 'Gravity Mode')
   await page.goto('/work')

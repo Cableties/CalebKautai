@@ -35,6 +35,26 @@ test('the nav moves between pages', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Selected work' })).toBeVisible()
 })
 
+test('the Fun stuff menu opens, closes, and leads to its pages', async ({ page }) => {
+  await visit(page, '/')
+  await openNav(page)
+  const nav = page.getByRole('navigation', { name: 'Main' })
+  const group = nav.getByRole('button', { name: 'Fun stuff' })
+  const wheel = nav.getByRole('link', { name: 'Decision wheel' })
+  await expect(wheel).toBeHidden()
+  await group.click()
+  await expect(wheel).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(wheel).toBeHidden()
+  await group.click()
+  await wheel.click()
+  await expect(page.getByRole('heading', { name: 'Decision wheel', level: 1 })).toBeVisible()
+  // Closed again on the new page, and marked as where you are
+  await openNav(page)
+  await expect(group).toHaveAttribute('aria-expanded', 'false')
+  await expect(group).toHaveClass(/active/)
+})
+
 test('the theme toggle switches to dark mode and remembers it', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'light' })
   await visit(page, '/')

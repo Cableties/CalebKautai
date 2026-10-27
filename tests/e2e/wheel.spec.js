@@ -133,8 +133,15 @@ test('the question and options are remembered for next time', async ({ page }) =
   await page.reload()
   await expect(page.getByLabel('What are we deciding?')).toHaveValue('Movie night')
   await expect(options(page).first().getByRole('textbox')).toHaveValue('Shrek')
+})
+
+test('"Start over" clears the wheel completely', async ({ page }) => {
+  await preset(page, 'Food')
   await page.getByRole('button', { name: 'Start over' }).click()
-  await expect(page.getByLabel('What are we deciding?')).toHaveValue(yesNo.question)
+  await expect(page.getByLabel('What are we deciding?')).toHaveValue('')
+  await expect(options(page)).toHaveCount(2)
+  for (const box of await options(page).getByRole('textbox').all()) await expect(box).toHaveValue('')
+  await expect(page.getByRole('button', { name: 'SPIN' })).toBeDisabled()
 })
 
 for (const size of [{ width: 1280, height: 560 }, { width: 1440, height: 900 }, { width: 390, height: 664 }]) {

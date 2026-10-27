@@ -112,10 +112,16 @@ export const nav = [
 	{ to: "/work", label: "Work" },
 	{ to: "/about", label: "About" },
 	{ to: "/tattoo", label: "Tattoo" },
-	{ to: "/aliens", label: "Aliens!" },
 	{ to: "/find-me", label: "Find me" },
-	{ to: "/cheat-codes", label: "Cheat codes" },
-	{ to: "/decision-wheel", label: "Decision wheel" },
+	// A group opens a little menu of its own
+	{
+		label: "Fun stuff",
+		items: [
+			{ to: "/aliens", label: "Aliens!" },
+			{ to: "/cheat-codes", label: "Cheat codes" },
+			{ to: "/decision-wheel", label: "Decision wheel" },
+		],
+	},
 ];
 
 export const intro =

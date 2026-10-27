@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Analytics } from '@vercel/analytics/react'
 import { contact, nav, socials } from '../content.js'
@@ -60,13 +60,17 @@ export default function Layout() {
           </div>
           <nav id="site-nav" aria-label="Main" className={menuOpen ? 'open' : ''}>
             <ul>
-              {nav.map((item) => (
-                <li key={item.to}>
-                  <NavLink to={item.to} end={item.to === '/'} viewTransition>
-                    {item.label}
-                  </NavLink>
-                </li>
-              ))}
+              {nav.map((item) =>
+                item.items ? (
+                  <NavGroup key={item.label} group={item} />
+                ) : (
+                  <li key={item.to}>
+                    <NavLink to={item.to} end={item.to === '/'} viewTransition>
+                      {item.label}
+                    </NavLink>
+                  </li>
+                ),
+              )}
             </ul>
           </nav>
         </header>
@@ -97,3 +101,50 @@ export default function Layout() {
   )
 }
 
+
+// A menu item with its own little menu: a drop-down on desktop, a fold-out list in the phone menu.
+// Closes on picking a page, Escape, or clicking anywhere else.
+function NavGroup({ group }) {
+  const { pathname } = useLocation()
+  const [open, setOpen] = useState(false)
+  const box = useRef(null)
+  const id = `nav-${group.label.toLowerCase().replace(/\W+/g, '-')}`
+  const here = group.items.some((item) => pathname.startsWith(item.to))
+
+  useEffect(() => setOpen(false), [pathname])
+  useEffect(() => {
+    if (!open) return
+    const away = (e) => box.current?.contains(e.target) || setOpen(false)
+    const escape = (e) => e.key === 'Escape' && (setOpen(false), box.current?.querySelector('button').focus())
+    document.addEventListener('pointerdown', away)
+    document.addEventListener('keydown', escape)
+    return () => {
+      document.removeEventListener('pointerdown', away)
+      document.removeEventListener('keydown', escape)
+    }
+  }, [open])
+
+  return (
+    <li className="nav-group" ref={box}>
+      <button
+        type="button"
+        className={here ? 'active' : ''}
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => setOpen((o) => !o)}
+      >
+        {group.label}
+        <span className="nav-caret" aria-hidden="true" />
+      </button>
+      <ul id={id} hidden={!open}>
+        {group.items.map((item) => (
+          <li key={item.to}>
+            <NavLink to={item.to} viewTransition>
+              {item.label}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </li>
+  )
+}

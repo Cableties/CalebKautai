@@ -50,6 +50,14 @@ export const PRESETS = [
 	},
 ];
 const STARTER = PRESETS[0];
+// "Start over": no question, two empty spots
+const BLANK = {
+	question: "",
+	options: [
+		{ label: "", weight: 1 },
+		{ label: "", weight: 1 },
+	],
+};
 
 let nextId = 1;
 const withIds = (options) => options.map((o) => ({ ...o, id: nextId++ }));
@@ -226,7 +234,7 @@ export default function DecisionWheel() {
 						<button
 							type="button"
 							className="wheel-reset"
-							onClick={() => usePreset(STARTER)}
+							onClick={() => usePreset(BLANK)}
 						>
 							Start over
 						</button>

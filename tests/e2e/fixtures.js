@@ -93,6 +93,14 @@ export async function openNav(page) {
   }).toPass()
 }
 
+// Open the menu and one of its groups (like "Fun stuff"), ready to click a page inside it
+export async function openNavGroup(page, name) {
+  await openNav(page)
+  const group = page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name })
+  if ((await group.getAttribute('aria-expanded')) !== 'true') await group.click()
+  await expect(group).toHaveAttribute('aria-expanded', 'true')
+}
+
 // Open the tattoo page and skip the hack cutscene (it plays on every visit)
 export async function openTattoo(page) {
   await page.goto('/tattoo')
