@@ -140,7 +140,8 @@ p {
   display: flex;
   gap: 0.3em;
   margin-right: auto;
-  font: 800 1.35rem/1 var(--display);
+  /* Big enough to anchor the header: about 1.8rem on phones, up to 2.6rem on wide screens */
+  font: 800 clamp(1.8rem, 1.2rem + 1.6vw, 2.6rem) / 1 var(--display);
   font-variation-settings: 'wdth' 75;
   text-decoration: none;
 }
