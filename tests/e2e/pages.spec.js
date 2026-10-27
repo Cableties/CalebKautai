@@ -156,37 +156,42 @@ test.describe('bouncing head on the good friend page', () => {
   })
 
   test('can be grabbed, carried and thrown', async ({ page }) => {
+    // On a pretend clock, so a throw's speed doesn't depend on how fast the machine running the test
+    // is (a slow one can take so long between the last move and letting go that it isn't a throw)
+    await page.clock.install()
     await page.goto('/tattoo-good-friend')
+    await page.clock.runFor(400)
     const head = page.locator('.bounce-head')
-    await page.waitForTimeout(400)
     const position = () => head.evaluate((el) => { const m = new DOMMatrix(getComputedStyle(el).transform); return [m.e, m.f] })
-    // Grab it, and carry it to the middle of the left side
+    // Grab it, and carry it to the left edge
     await grabHead(page)
-    const view = page.viewportSize()
-    await page.mouse.move(60, view.height / 2, { steps: 10 })
-    // While held it stays with the pointer. A slow browser can still be catching up on the drag's
-    // last few moves, so wait until it's settled first.
-    let heldX
+    const y = page.viewportSize().height / 2
+    await page.mouse.move(20, y, { steps: 10 })
+    await page.clock.runFor(100)
+    // While held it stays with the pointer
+    const [heldX] = await position()
+    await page.clock.runFor(300)
+    expect(Math.abs((await position())[0] - heldX)).toBeLessThan(1)
+    // Fling it right, 40px a frame, and let go mid-swing. Now and then the browser's input timing
+    // and the pretend clock don't line up and a fling doesn't take, so it gets a few goes.
     await expect(async () => {
-      const [before] = await position()
-      await page.waitForTimeout(100)
-      heldX = (await position())[0]
-      expect(Math.abs(heldX - before)).toBeLessThan(1)
-    }).toPass()
-    await page.waitForTimeout(300)
-    expect(Math.abs((await position())[0] - heldX)).toBeLessThan(2)
-    // Fling it right, fast, and let go mid-swing
-    for (let i = 1; i <= 6; i++) {
-      await page.mouse.move(60 + i * 40, view.height / 2)
-      await page.waitForTimeout(10)
-    }
-    await page.mouse.up()
-    const [x0] = await position()
-    await page.waitForTimeout(150)
-    const [x1] = await position()
-    // Far faster than its 140px/s cruise (which would cover ~21px in that time). A slow machine
-    // measures a slower throw, so the bar is well above cruising but not right at the limit.
-    expect(Math.abs(x1 - x0)).toBeGreaterThan(45)
+      if (!(await head.evaluate((el) => el.classList.contains('held')))) {
+        await grabHead(page)
+        await page.mouse.move(20, y, { steps: 5 })
+        await page.clock.runFor(200)
+      }
+      for (let i = 1; i <= 4; i++) {
+        await page.mouse.move(20 + i * 40, y)
+        await page.clock.runFor(16)
+      }
+      await page.mouse.up()
+      await page.clock.runFor(16)
+      const [x0] = await position()
+      await page.clock.runFor(50)
+      const [x1] = await position()
+      // Far faster than its 140px/s cruise, which would cover 7px in that time
+      expect(x1 - x0).toBeGreaterThan(40)
+    }).toPass({ timeout: 20_000 })
   })
 
   test('a quick tap on the head goes through to the button underneath', async ({ page }) => {

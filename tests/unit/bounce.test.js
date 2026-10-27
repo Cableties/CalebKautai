@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { MIN_SLOPE, POSES, TILTS, frame, normalise, nudge, pose, step } from '../../src/lib/bounce.js'
+import { HEADS, MIN_SLOPE, POSES, SPEED, TILTS, collide, faceCircle, frame, normalise, nudge, pose, step, touching } from '../../src/lib/bounce.js'
 
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) < eps
 
@@ -128,4 +128,59 @@ test('a hard throw ricochets around, stays on screen, and slows back to cruising
   }
   assert.ok(bounces > 10, `only ${bounces} bounces in the first 8 seconds`)
   assert.ok(state.speed < SPEED * 1.5, `still going ${state.speed.toFixed(0)}px/s after 8 seconds`)
+})
+
+test('two heads touch when their faces meet, not just their frames', () => {
+  const { caleb, amber } = HEADS
+  const px = 3
+  const at = (x, y, sprite) => faceCircle({ x, y }, sprite, px)
+  const him = at(100, 100, caleb.sprite)
+  // Face to face
+  assert.ok(touching(him, at(100 + caleb.sprite.art * px * 0.8, 100, caleb.sprite)))
+  // Frames overlapping corner to corner, but the faces still apart
+  const corner = at(100 + caleb.sprite.width * px * 0.9, 100 + caleb.sprite.height * px * 0.9, caleb.sprite)
+  assert.ok(!touching(him, corner))
+  // Hers is a different size, centred in her own frame
+  const her = at(100, 100, amber.sprite)
+  assert.equal(her.x, 100 + (amber.sprite.width * px) / 2)
+  assert.ok(touching(him, her))
+})
+
+// Two heads' states, and their faces, as circles of radius 40 centred on (x, y)
+const head = (x, travel, speed = SPEED) => ({ x, y: 100, travel, facing: travel, squash: 0, speed })
+const face = (s) => ({ x: s.x, y: s.y, r: 40 })
+const vx = (s) => Math.cos((s.travel * Math.PI) / 180) * s.speed
+
+test('heads meeting head-on bounce back off each other, and are pushed apart', () => {
+  const [a, b] = collide(head(100, 0), head(170, 180), face(head(100, 0)), face(head(170, 180)))
+  assert.ok(vx(a) < 0 && vx(b) > 0, `now heading ${a.travel}° and ${b.travel}°`)
+  assert.ok(!touching(face(a), face(b)), 'no longer overlapping')
+})
+
+test('heads already moving apart are just separated, not turned round', () => {
+  const [a0, b0] = [head(100, 180), head(170, 0)]
+  const [a, b] = collide(a0, b0, face(a0), face(b0))
+  assert.equal(a.travel, 180)
+  assert.equal(b.travel, 0)
+  assert.ok(!touching(face(a), face(b)))
+})
+
+test('a dragged head shoves the other out of the way without budging itself', () => {
+  const [held, free] = [head(100, 0), head(150, 180)]
+  const [a, b] = collide(held, free, face(held), face(free), { aHeld: true, push: [900, 0] })
+  assert.deepEqual(a, held)
+  assert.ok(!touching(face(a), face(b)), 'pushed clear')
+  assert.ok(vx(b) >= 900 - 1, `sent off at ${vx(b)} px/s`)
+  // The same with the held one second
+  const [b2, a2] = collide(free, held, face(free), face(held), { bHeld: true, push: [900, 0] })
+  assert.deepEqual(a2, held)
+  assert.ok(vx(b2) >= 900 - 1)
+  // Two held heads (two fingers) are left where the fingers put them
+  assert.deepEqual(collide(held, free, face(held), face(free), { aHeld: true, bHeld: true }), [held, free])
+})
+
+test('a head shoved against a wall, already heading back out, is not turned round again', () => {
+  const s = step(head(600, 180), 1 / 60, 500, 500)
+  assert.equal(s.x, 500)
+  assert.ok(vx(s) < 0)
 })

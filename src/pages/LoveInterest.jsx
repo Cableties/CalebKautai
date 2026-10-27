@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import BouncingHead from '../components/BouncingHead.jsx'
+import { useCheats } from '../components/Cheats.jsx'
 import Taken from '../components/Taken.jsx'
 import { contact, img } from '../content.js'
 
@@ -14,6 +16,8 @@ const fields = [
 export default function LoveInterest() {
   // idle → sending → sent | error with Formspree; idle → mailto without it
   const [status, setStatus] = useState('idle')
+  // With Amber Mode on, Amber's site-wide head is already bouncing around
+  const amberMode = useCheats().isOn('amber')
 
   async function submit(e) {
     e.preventDefault()
@@ -44,6 +48,7 @@ export default function LoveInterest() {
 
   return (
     <article className="page love">
+      {!amberMode && <BouncingHead who="amber" />}
       <Taken />
       <p className="selected">Ooh la la! You have selected: “love interest”</p>
       <h1 className="page-title">Hey! My name's Caleb Kautai!</h1>

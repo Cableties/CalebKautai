@@ -41,6 +41,66 @@ test('Head Mode puts the bouncing head on every page', async ({ page }) => {
   await expect(page.locator('.bounce-head')).toHaveCount(1)
 })
 
+test("Amber's head bounces on the love interest page, and Amber Mode puts it on every page", async ({ page }) => {
+  const amber = page.locator('.bounce-head[data-head="amber"]')
+  await page.goto('/tattoo-love-interest')
+  await expect(amber).toHaveCount(1)
+  await expect(page.locator('.bounce-head')).toHaveCount(1)
+  // Her own sheet, in taller frames
+  expect(await amber.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('amber-sprites.png')
+  expect(await amber.evaluate((el) => el.offsetHeight / el.offsetWidth)).toBeGreaterThan(1)
+
+  await openCheats(page)
+  await expect(amber).toHaveCount(0)
+  await toggleCheat(page, 'Amber Mode')
+  await expect(amber).toHaveCount(1)
+  // Both heads at once
+  await toggleCheat(page, 'Head Mode')
+  await expect(page.locator('.bounce-head')).toHaveCount(2)
+  // Still only one of Amber on the page that already had its own
+  await page.goto('/tattoo-love-interest')
+  await expect(amber).toHaveCount(1)
+})
+
+test('typing AMBER switches on Amber Mode', async ({ page }) => {
+  await page.goto('/')
+  await page.keyboard.type('amber')
+  await expect(html(page)).toHaveAttribute('data-cheat-amber', '')
+  await expect(page.locator('.bounce-head[data-head="amber"]')).toHaveCount(1)
+})
+
+test.describe('both heads', () => {
+  test.use({ grabbableHead: true })
+
+  test('dragging one into the other shoves it, and puts a pixel heart over them', async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('cheats', JSON.stringify(['head'])))
+    // Frozen time: the heads only move when the test says, so they stay where they're measured
+    await page.clock.install()
+    await page.goto('/tattoo-love-interest')
+    await page.keyboard.press('Escape') // the "I'm taken" popup
+    await page.clock.runFor(400)
+    const heart = page.locator('.bump-heart')
+    const centre = async (who) => {
+      const box = await page.locator(`.bounce-head[data-head="${who}"]`).boundingBox()
+      return [box.x + box.width / 2, box.y + box.height / 2]
+    }
+    // Carry Amber's head onto Caleb's: his gets pushed out of the way
+    await expect(async () => {
+      const [x, y] = await centre('caleb')
+      await page.mouse.move(...(await centre('amber')))
+      await page.mouse.down()
+      await page.mouse.move(x, y, { steps: 5 })
+      await page.clock.runFor(50)
+      const [x2, y2] = await centre('caleb')
+      await page.mouse.up()
+      expect(Math.hypot(x2 - x, y2 - y)).toBeGreaterThan(30)
+      expect(await heart.count()).toBeGreaterThan(0)
+    }).toPass({ timeout: 10_000 })
+    await expect(heart.first()).toHaveAttribute('aria-hidden', 'true')
+    expect(await heart.first().evaluate((el) => getComputedStyle(el).pointerEvents)).toBe('none')
+  })
+})
+
 test('Dance Mode cycles the colours', async ({ page }) => {
   await openCheats(page)
   await toggleCheat(page, 'Dance Mode')

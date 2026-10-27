@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { POSES, SPRITE, TILTS, frame, nudge, release, step } from '../lib/bounce.js'
+import { HEADS, POSES, TILTS, collide, faceCircle, frame, nudge, parted, release, step, touching } from '../lib/bounce.js'
 
-// Caleb's head bouncing around the screen as pixel art, facing the way it's travelling (maths in
-// lib/bounce.js, sprite sheet from scripts/pixel-sprites.mjs). Grab it and throw it: it flies off
-// the way it was flung, then settles back to its normal bounce. Each frame picks a sprite and
-// writes it straight to the DOM, without re-rendering.
-const SHEET = '/images/bounce-sprites.png'
+// A head (Caleb's or Amber's: HEADS in lib/bounce.js) bouncing around the screen as pixel art,
+// facing the way it's travelling (maths in lib/bounce.js, sprite sheets from
+// scripts/pixel-sprites.mjs). Grab it and throw it: it flies off the way it was flung, then settles
+// back to its normal bounce. Each frame picks a sprite and writes it straight to the DOM, without
+// re-rendering.
 const THROW_WINDOW = 90 // ms of pointer movement to measure a throw's speed from
 // A press that barely moves and lets go quickly is a tap, not a grab: it goes through to whatever
 // the head is floating over, so the head never blocks a button or link
@@ -16,6 +16,36 @@ const TAP_MS = 350
 const pixelSize = () =>
   (innerWidth >= 600 ? 3 : 2) * (document.documentElement.hasAttribute('data-cheat-bighead') ? 2 : 1)
 
+// Every head on screen, so they can bump into each other: they bounce off (or, dragging one, shove
+// the other out of the way, collide() in lib/bounce.js) and a little pixel heart pops up over them.
+// One heart as they meet, not again until they've clearly parted, and not more than one a second
+// (so a head pushed along by another doesn't spray hearts).
+const heads = new Set()
+let nextId = 0
+const HEART_GAP = 1000
+let lastHeart = -Infinity
+
+// How fast the pointer has been moving a held head, in px per second, over the last few moments.
+// Still for longer than that, and it's not moving at all.
+function dragVelocity(hold) {
+  const [first, latest] = [hold.samples[0], hold.samples.at(-1)]
+  const seconds = Math.max((latest[0] - first[0]) / 1000, 0.001)
+  if (performance.now() - latest[0] >= THROW_WINDOW) return [0, 0]
+  return [(latest[1] - first[1]) / seconds, (latest[2] - first[2]) / seconds]
+}
+
+function heart(a, b, px, parent) {
+  const el = document.createElement('div')
+  el.className = 'bump-heart'
+  el.setAttribute('aria-hidden', 'true')
+  el.style.setProperty('--px', `${px}px`)
+  el.style.left = `${(a.x + b.x) / 2}px`
+  // Just above the higher face, but never off the top of the screen (the heart is 16 px tall)
+  el.style.top = `${Math.max(Math.min(a.y - a.r, b.y - b.r), 16 * px)}px`
+  el.addEventListener('animationend', () => el.remove())
+  parent.append(el)
+}
+
 // Australia Mode turns the page (and the head with it) upside down, so the pointer's screen
 // position has to be flipped to land in the head's own frame
 function pointerAt(e) {
@@ -23,8 +53,10 @@ function pointerAt(e) {
   return flipped ? [innerWidth - e.clientX, innerHeight - e.clientY] : [e.clientX, e.clientY]
 }
 
-// `chosen`: the visitor turned it on themselves (Head Mode), so it runs even with reduced motion
-export default function BouncingHead({ chosen = false }) {
+// `who`: which head (a key of HEADS). `chosen`: the visitor turned it on themselves (a cheat), so it
+// runs even with reduced motion
+export default function BouncingHead({ who = 'caleb', chosen = false }) {
+  const { sheet, sprite } = HEADS[who]
   const [on, setOn] = useState(false)
   const head = useRef(null)
   const state = useRef(null)
@@ -42,14 +74,51 @@ export default function BouncingHead({ chosen = false }) {
     const el = head.current
     let px = pixelSize()
     state.current = {
-      x: Math.random() * Math.max(0, innerWidth - SPRITE.width * px),
-      y: Math.random() * Math.max(0, innerHeight - SPRITE.height * px),
+      x: Math.random() * Math.max(0, innerWidth - sprite.width * px),
+      y: Math.random() * Math.max(0, innerHeight - sprite.height * px),
       travel: nudge(Math.random() * 360),
       squash: 0,
     }
     state.current.facing = state.current.travel
     let last = performance.now()
     let animation
+    // This head, for the others to bump into: its state, where its face is, whether it's held, and
+    // which heads it's touching
+    const me = {
+      id: nextId++,
+      state,
+      held,
+      face: () => faceCircle(state.current, sprite, px),
+      touching: new Set(),
+    }
+    heads.add(me)
+
+    // Each pair is handled once a frame, by whichever of the two joined first
+    function bump(now) {
+      for (const other of heads) {
+        if (other.id <= me.id) continue
+        const [face, otherFace] = [me.face(), other.face()]
+        if (touching(face, otherFace)) {
+          if (!me.touching.has(other)) {
+            me.touching.add(other)
+            other.touching.add(me)
+            if (now - lastHeart >= HEART_GAP) {
+              lastHeart = now
+              heart(face, otherFace, px, el.parentElement)
+            }
+          }
+          const pusher = me.held.current ?? other.held.current
+          ;[me.state.current, other.state.current] = collide(me.state.current, other.state.current, face, otherFace, {
+            aHeld: !!me.held.current,
+            bHeld: !!other.held.current,
+            push: pusher ? dragVelocity(pusher) : [0, 0],
+          })
+        } else if (me.touching.has(other) && parted(face, otherFace)) {
+          me.touching.delete(other)
+          other.touching.delete(me)
+        }
+      }
+    }
 
     function tick(now) {
       // Capped, so it doesn't leap after the tab has been in the background
@@ -57,8 +126,8 @@ export default function BouncingHead({ chosen = false }) {
       last = now
       px = pixelSize()
       el.style.setProperty('--px', `${px}px`)
-      const maxX = Math.max(0, innerWidth - SPRITE.width * px)
-      const maxY = Math.max(0, innerHeight - SPRITE.height * px)
+      const maxX = Math.max(0, innerWidth - sprite.width * px)
+      const maxY = Math.max(0, innerHeight - sprite.height * px)
       // While it's held, the pointer moves it; otherwise it flies
       if (!held.current) state.current = step(state.current, dt, maxX, maxY)
       const s = state.current
@@ -69,12 +138,17 @@ export default function BouncingHead({ chosen = false }) {
       const x = Math.round(s.x * dpr) / dpr
       const y = Math.round(s.y * dpr) / dpr
       el.style.transform = `translate(${x}px, ${y}px) scaleX(${mirrored ? -1 : 1})`
-      el.style.backgroundPosition = `${-col * SPRITE.width * px}px ${-row * SPRITE.height * px}px`
+      el.style.backgroundPosition = `${-col * sprite.width * px}px ${-row * sprite.height * px}px`
+      bump(now)
       animation = requestAnimationFrame(tick)
     }
     animation = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(animation)
-  }, [on])
+    return () => {
+      cancelAnimationFrame(animation)
+      heads.delete(me)
+      for (const other of heads) other.touching.delete(me)
+    }
+  }, [on, sprite])
 
   function grab(e) {
     e.preventDefault()
@@ -91,8 +165,8 @@ export default function BouncingHead({ chosen = false }) {
     const [px, py] = pointerAt(e)
     const size = pixelSize()
     const s = state.current
-    const x = Math.min(Math.max(px - hold.dx, 0), Math.max(0, innerWidth - SPRITE.width * size))
-    const y = Math.min(Math.max(py - hold.dy, 0), Math.max(0, innerHeight - SPRITE.height * size))
+    const x = Math.min(Math.max(px - hold.dx, 0), Math.max(0, innerWidth - sprite.width * size))
+    const y = Math.min(Math.max(py - hold.dy, 0), Math.max(0, innerHeight - sprite.height * size))
     // Face the way it's being dragged
     const moved = Math.hypot(x - s.x, y - s.y)
     const facing = moved > 1.5 ? (Math.atan2(y - s.y, x - s.x) * 180) / Math.PI : s.facing
@@ -112,11 +186,7 @@ export default function BouncingHead({ chosen = false }) {
       return
     }
     // Throw speed: how far the pointer moved over the last few moments
-    const [first, latest] = [hold.samples[0], hold.samples.at(-1)]
-    const seconds = Math.max((latest[0] - first[0]) / 1000, 0.001)
-    const recent = performance.now() - latest[0] < THROW_WINDOW
-    const [vx, vy] = recent ? [(latest[1] - first[1]) / seconds, (latest[2] - first[2]) / seconds] : [0, 0]
-    state.current = release(state.current, vx, vy)
+    state.current = release(state.current, ...dragVelocity(hold))
   }
 
   // Click whatever is under the head at that point, as if the head weren't there
@@ -134,6 +204,7 @@ export default function BouncingHead({ chosen = false }) {
   return (
     <div
       className="bounce-head"
+      data-head={who}
       ref={head}
       aria-hidden="true"
       onPointerDown={grab}
@@ -141,11 +212,11 @@ export default function BouncingHead({ chosen = false }) {
       onPointerUp={letGo}
       onPointerCancel={letGo}
       style={{
-        '--sheet': `url(${SHEET})`,
+        '--sheet': `url(${sheet})`,
         '--cols': TILTS.length,
         '--rows': POSES.length,
-        '--w': SPRITE.width,
-        '--h': SPRITE.height,
+        '--w': sprite.width,
+        '--h': sprite.height,
       }}
     />
   )

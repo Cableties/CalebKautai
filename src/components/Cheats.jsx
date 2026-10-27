@@ -10,6 +10,7 @@ import Hack from './Hack.jsx'
 // index.html applies the saved ones before first paint, like the theme.
 export const CHEATS = [
   { id: 'head', name: 'Head Mode', description: 'My head bounces around every page. Forever.', code: 'HEAD' },
+  { id: 'amber', name: 'Amber Mode', description: "Amber's head bounces around every page too, hair flying.", code: 'AMBER' },
   { id: 'bighead', name: 'Big Head Mode', description: 'Every photo of me becomes a wobbling bobblehead.', code: 'BIGHEAD' },
   { id: 'dance', name: 'Dance Mode', description: 'Every colour on the site cycles like a disco floor.', code: 'DISCO' },
   { id: 'australia', name: 'Australia Mode', description: 'View the site the way we see it down here.', code: 'GDAY' },
@@ -131,6 +132,8 @@ export function CheatsProvider({ children }) {
       {children}
       {/* Head Mode: one head on every page (the good friend page leaves its own out when this is on) */}
       {isOn('head') && <BouncingHead chosen />}
+      {/* Amber Mode: Amber's head too (the love interest page leaves its own out when this is on) */}
+      {isOn('amber') && <BouncingHead who="amber" chosen />}
       {isOn('matrix') && <MatrixRain />}
       {isOn('trail') && <HeadTrail />}
       {isOn('8bit') && <PixelFilter />}
