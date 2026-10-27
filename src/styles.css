@@ -3599,8 +3599,11 @@ a {
 .bonk {
   position: relative;
   justify-self: center;
-  /* Board and score bar both fit on the screen */
-  width: min(100%, 440px, calc(100dvh - 90px));
+  /* Board and score bar both fit on the screen. The 100% is a max-width, not in the width: the
+     game layout's column is sized by the board, and the holes have no size of their own, so a
+     percentage width shrank it to nothing on desktop */
+  width: min(440px, calc(100dvh - 90px));
+  max-width: 100%;
   padding: 16px;
   background: #bfe8d6;
   border: 3px solid var(--ink);
@@ -3660,6 +3663,20 @@ a {
   translate: 0 110%;
   transition: translate 0.12s ease-out;
   pointer-events: none;
+}
+/* The cheats that change the bouncing head change Bonk's too (Flappy Head and Pinball do it in
+   lib/gameHead.js): Dance Mode tints it the disco hue, Matrix Mode turns it green, Big Head Mode
+   makes it a bigger, wobbling bobblehead (a bonk still squashes it, below) */
+:root[data-cheat-dance] .bonk-head {
+  filter: sepia(1) saturate(3) hue-rotate(calc((var(--disco) - 40) * 1deg));
+}
+:root[data-cheat-matrix] .bonk-head {
+  filter: grayscale(1) sepia(1) hue-rotate(80deg) saturate(5);
+}
+:root[data-cheat-bighead] .bonk-head {
+  scale: 1.25;
+  transform-origin: 50% 90%;
+  animation: bobble 1.3s ease-in-out infinite;
 }
 .bonk-hole.up .bonk-head {
   translate: 0 0;

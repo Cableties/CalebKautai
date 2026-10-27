@@ -1,14 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { POSES, TILTS, frame } from '../lib/bounce.js'
+import { HEADS, POSES, TILTS, frame } from '../lib/bounce.js'
 import { GAP_MS, HOLES, ROUND_MS, nextHole, upTime } from '../lib/bonk.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
 import SoundToggle from '../components/SoundToggle.jsx'
 import { feedback } from '../lib/feedback.js'
+import { useCheats } from '../components/Cheats.jsx'
 
 // Bonk: whack-a-mole with Caleb's pixel head. The rules are in lib/bonk.js; the holes are buttons,
 // so it works with a mouse, a finger or a keyboard.
 const GAME = 'bonk'
+
+// Whoever's playing, sized so their face (sprite.art) is just under half the hole's width, whatever
+// else is round it (Amber's hair)
+const FACE = 48 // % of the hole
+function look(who) {
+  const { sheet, sprite } = HEADS[who]
+  const width = (FACE * sprite.width) / sprite.art
+  return {
+    backgroundImage: `url(${sheet})`,
+    width: `${width}%`,
+    left: `${(100 - width) / 2}%`,
+    aspectRatio: `${sprite.width} / ${sprite.height}`,
+  }
+}
 
 // Background position of one sprite frame, in percent so it works at any size
 function sprite(facing) {
@@ -26,7 +41,7 @@ export default function Bonk() {
   const [bonked, setBonked] = useState(null) // the hole that was just hit, for the squash
   const [missed, setMissed] = useState(null) // an empty hole just tapped, for a puff of dust
   const [left, setLeft] = useState(ROUND_MS)
-  const [look, setLook] = useState(0) // which way the head faces this time
+  const [facing, setFacing] = useState(0) // which way the head faces this time
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null)
   const [best, record] = useBest(GAME)
@@ -35,6 +50,7 @@ export default function Bonk() {
   const board = useRef(null)
   const started = useRef(0)
   const scoreRef = useRef(0)
+  const { player } = useCheats()
 
   const later = (fn, ms) => timers.current.push(setTimeout(fn, ms))
   const clear = () => {
@@ -48,7 +64,7 @@ export default function Bonk() {
     if (elapsed >= ROUND_MS) return
     const next = nextHole(previous)
     setHole(next)
-    setLook([0, 180, -20, 200][Math.floor(Math.random() * 4)])
+    setFacing([0, 180, -20, 200][Math.floor(Math.random() * 4)])
     const stay = upTime(elapsed)
     later(() => {
       setHole((h) => (h === next ? null : h))
@@ -133,7 +149,7 @@ export default function Bonk() {
                 onClick={(e) => e.detail === 0 && bonk(i)} // keyboard (Enter or Space)
                 disabled={phase !== 'playing'}
               >
-                <span className="bonk-head" style={sprite(look)} aria-hidden="true" />
+                <span className="bonk-head" style={{ ...look(player), ...sprite(facing) }} aria-hidden="true" />
                 <span className="bonk-stars" aria-hidden="true">
                   ✦ ✧ ✦
                 </span>

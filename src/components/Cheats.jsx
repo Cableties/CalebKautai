@@ -31,6 +31,13 @@ const FONTS = {
   comic: 'https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&display=swap',
 }
 
+// The other secret: switch Amber Mode on and off three times (six flips, close together) and Amber
+// takes over from Caleb in the games. Doing it again brings Caleb back. Unlike the cheats, this is
+// remembered for good, like the games' sound setting.
+const PLAYER_KEY = 'games-player'
+const AMBER_FLIPS = 6
+const AMBER_WINDOW = 30000 // ms, for all six
+
 const STORAGE_KEY = 'cheats'
 const CheatsContext = createContext(null)
 export const useCheats = () => useContext(CheatsContext)
@@ -60,6 +67,9 @@ export function CheatsProvider({ children }) {
   const keys = useRef([])
   const firstRun = useRef(true)
   const { pathname } = useLocation()
+  // Who you play as in the games (a key of HEADS in lib/bounce.js)
+  const [player, setPlayer] = useState('caleb')
+  const amberFlips = useRef([])
 
   useEffect(() => {
     try {
@@ -68,7 +78,30 @@ export function CheatsProvider({ children }) {
     } catch {
       // Nothing saved, or storage blocked
     }
+    try {
+      if (localStorage.getItem(PLAYER_KEY) === 'amber') setPlayer('amber')
+    } catch {
+      // Storage blocked: Caleb it is
+    }
   }, [])
+
+  function flipAmber() {
+    const now = Date.now()
+    amberFlips.current = [...amberFlips.current, now].filter((t) => now - t <= AMBER_WINDOW)
+    if (amberFlips.current.length < AMBER_FLIPS) return false
+    amberFlips.current = []
+    setPlayer((was) => {
+      const next = was === 'amber' ? 'caleb' : 'amber'
+      try {
+        localStorage.setItem(PLAYER_KEY, next)
+      } catch {
+        // Storage blocked: it lasts until the page is closed
+      }
+      setToast({ text: next === 'amber' ? 'Amber unlocked: she’s playing the games now' : 'Caleb’s back in the games', key: now })
+      return next
+    })
+    return true
+  }
 
   useEffect(() => {
     // The first run still has the empty starting state: skip it, or it would undo the attributes
@@ -86,9 +119,11 @@ export function CheatsProvider({ children }) {
 
   function toggle(id) {
     const cheat = CHEATS.find((c) => c.id === id)
+    // The sixth flip shows the unlock instead of the usual toast
+    const unlocked = id === 'amber' && flipAmber()
     setActive((now) => {
       const on = !now.includes(id)
-      setToast({ text: `${cheat.name} ${on ? 'activated' : 'deactivated'}`, key: Date.now() })
+      if (!unlocked) setToast({ text: `${cheat.name} ${on ? 'activated' : 'deactivated'}`, key: Date.now() })
       return on ? [...now, id] : now.filter((c) => c !== id)
     })
   }
@@ -126,7 +161,7 @@ export function CheatsProvider({ children }) {
   }, [toast])
 
   const isOn = (id) => active.includes(id)
-  const value = { active, isOn, toggle, reset, runKonami }
+  const value = { active, isOn, toggle, reset, runKonami, player }
   return (
     <CheatsContext.Provider value={value}>
       {children}

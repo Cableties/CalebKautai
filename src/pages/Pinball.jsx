@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { SPRITE, frame } from "../lib/bounce.js";
+import { HEADS } from "../lib/bounce.js";
+import { gameHead } from "../lib/gameHead.js";
 import {
 	BALL,
 	BALLS,
@@ -23,11 +24,11 @@ import {
 } from "../components/Scores.jsx";
 import SoundToggle from "../components/SoundToggle.jsx";
 import { feedback } from "../lib/feedback.js";
+import { useCheats } from "../components/Cheats.jsx";
 
 // Pinball, with Caleb's pixel head as the ball, on a choice of themed tables. The physics, rules and
 // table layouts are in lib/pinball.js; this draws them on a canvas and handles input: tap or hold
 // either side of the table (or the arrow keys) to flip, and tap (or Space) to launch.
-const SHEET = "/images/bounce-sprites.png";
 const LEFT_KEYS = ["ArrowLeft", "z", "Z", "a", "A", "Shift"];
 const RIGHT_KEYS = ["ArrowRight", "m", "M", "/", "d", "D"];
 const LAUNCH_KEYS = [" ", "Enter", "ArrowDown"];
@@ -176,7 +177,7 @@ function effects(a, b) {
 	if (hit(a.flash.kickers, b.flash.kickers)) feedback("kicker");
 }
 
-function draw(ctx, game, sheet, table, time, held) {
+function draw(ctx, game, head, looks, table, time, held) {
 	const theme = THEMES[table.theme];
 	const bg = ctx.createLinearGradient(0, 0, 0, HEIGHT);
 	bg.addColorStop(0, theme.bg[0]);
@@ -285,32 +286,19 @@ function draw(ctx, game, sheet, table, time, held) {
 		}
 	}
 
-	// The ball: the head, facing the way it's rolling
-	if (!game.over && sheet.complete && sheet.naturalWidth) {
+	// The ball: the head, facing the way it's rolling. Sized by the face, which is the ball: hair round
+	// it (Amber's) and Big Head Mode's bobblehead are just for show
+	if (!game.over) {
 		const { x, y, vx, vy } = game.ball;
-		const { row, col, mirrored } = frame(
-			Math.hypot(vx, vy) > 40 ? (Math.atan2(vy, vx) * 180) / Math.PI : 0,
-		);
-		const scale = (BALL * 2.6) / SPRITE.art;
-		const w = SPRITE.width * scale;
-		const h = SPRITE.height * scale;
-		ctx.save();
-		ctx.imageSmoothingEnabled = false;
-		ctx.translate(x, y);
-		if (mirrored) ctx.scale(-1, 1);
-		if (game.held) ctx.globalAlpha = 0.5; // down the hole
-		ctx.drawImage(
-			sheet,
-			col * SPRITE.width,
-			row * SPRITE.height,
-			SPRITE.width,
-			SPRITE.height,
-			-w / 2,
-			-h / 2,
-			w,
-			h,
-		);
-		ctx.restore();
+		looks.draw(ctx, head, {
+			x,
+			y,
+			size: BALL * 2.6,
+			facing:
+				Math.hypot(vx, vy) > 40 ? (Math.atan2(vy, vx) * 180) / Math.PI : 0,
+			time,
+			alpha: game.held ? 0.5 : 1, // down the hole
+		});
 	}
 }
 
@@ -351,11 +339,20 @@ export default function Pinball() {
 		setPhase("ready");
 	}, [table.id]);
 
+	// Whoever's playing: their sprite sheet and its frame size
+	const { player } = useCheats();
+	const head = useRef(null);
+	const looks = useRef(null); // the cheats' effects on it (lib/gameHead.js)
 	useEffect(() => {
 		const sheet = new Image();
-		sheet.src = SHEET;
+		sheet.src = HEADS[player].sheet;
+		head.current = { sheet, sprite: HEADS[player].sprite };
+	}, [player]);
+
+	useEffect(() => {
 		const el = canvas.current;
 		const ctx = el.getContext("2d");
+		looks.current = gameHead();
 		let last = performance.now();
 		let animation;
 
@@ -406,7 +403,15 @@ export default function Pinball() {
 				);
 			}
 			ctx.setTransform(el.width / WIDTH, 0, 0, el.height / HEIGHT, 0, 0);
-			draw(ctx, game.current, sheet, t, now / 1000, held.current);
+			draw(
+				ctx,
+				game.current,
+				head.current,
+				looks.current,
+				t,
+				now / 1000,
+				held.current,
+			);
 			animation = requestAnimationFrame(tick);
 		}
 		animation = requestAnimationFrame(tick);

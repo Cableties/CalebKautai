@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { SPRITE, frame } from '../lib/bounce.js'
+import { HEADS } from '../lib/bounce.js'
+import { gameHead } from '../lib/gameHead.js'
 import { GROUND, HEAD_X, HEIGHT, PIPE_WIDTH, RADIUS, SPEED, WIDTH, facing, flap, start, step } from '../lib/flappy.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
 import SoundToggle from '../components/SoundToggle.jsx'
 import { feedback } from '../lib/feedback.js'
+import { useCheats } from '../components/Cheats.jsx'
 
 // Flappy Head: the bouncing head's pixel-art sprites, flapping through pastel pipes. The rules are
 // in lib/flappy.js; this draws them on a canvas and handles input.
 const GAME = 'flappy-head'
-const SHEET = '/images/bounce-sprites.png'
 const COLOURS = {
   skyTop: '#cfe6f7',
   skyBottom: '#fbeaf2',
@@ -34,7 +35,7 @@ const CLOUDS = [
   [330, 60, 18],
 ]
 
-function draw(ctx, game, sheet, distance, puffs, time) {
+function draw(ctx, game, head, looks, distance, puffs, time, scroll) {
   const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
   sky.addColorStop(0, COLOURS.skyTop)
   sky.addColorStop(1, COLOURS.skyBottom)
@@ -102,19 +103,17 @@ function draw(ctx, game, sheet, distance, puffs, time) {
   }
   ctx.globalAlpha = 1
 
-  // The head: one frame of the sprite sheet, sized so the face fills the hitbox
-  if (sheet.complete && sheet.naturalWidth) {
-    const { row, col, mirrored } = frame(game.dead ? 70 : facing(game.vy))
-    const scale = (game.radius * 2.3) / SPRITE.art
-    const w = SPRITE.width * scale
-    const h = SPRITE.height * scale
-    ctx.save()
-    ctx.imageSmoothingEnabled = false
-    ctx.translate(HEAD_X, game.y)
-    if (mirrored) ctx.scale(-1, 1)
-    ctx.drawImage(sheet, col * SPRITE.width, row * SPRITE.height, SPRITE.width, SPRITE.height, -w / 2, -h / 2, w, h)
-    ctx.restore()
-  }
+  // The head, sized by its face, so the face fills the hitbox and anything outside it (Amber's hair)
+  // can brush the pipes without counting. Big Head Mode has already grown the hitbox (fresh()).
+  looks.draw(ctx, head, {
+    x: HEAD_X,
+    y: game.y,
+    size: game.radius * 2.3,
+    facing: game.dead ? 70 : facing(game.vy),
+    time,
+    scroll,
+    grows: false,
+  })
 
   // The score, big and outlined, at the top
   ctx.font = '800 56px system-ui, sans-serif'
@@ -130,7 +129,9 @@ export default function FlappyHead() {
   const canvas = useRef(null)
   const stage = useRef(null)
   const game = useRef(null)
-  const sheet = useRef(null)
+  const head = useRef(null) // the sprite sheet of whoever's playing, and its frame size
+  const looks = useRef(null) // the cheats' effects on it (lib/gameHead.js)
+  const { player } = useCheats()
   const [phase, setPhase] = useState('ready') // ready | playing | over
   const [score, setScore] = useState(0)
   const [newBest, setNewBest] = useState(false)
@@ -145,10 +146,15 @@ export default function FlappyHead() {
 
   const fresh = () => start({ radius: RADIUS * (document.documentElement.hasAttribute('data-cheat-bighead') ? 1.6 : 1) })
 
+  useEffect(() => {
+    const sheet = new Image()
+    sheet.src = HEADS[player].sheet
+    head.current = { sheet, sprite: HEADS[player].sprite }
+  }, [player])
+
   // Draw at the canvas's real size on screen, so it's sharp on any display
   useEffect(() => {
-    sheet.current = new Image()
-    sheet.current.src = SHEET
+    looks.current = gameHead()
     game.current = fresh()
     const el = canvas.current
     const ctx = el.getContext('2d')
@@ -188,7 +194,8 @@ export default function FlappyHead() {
       ctx.setTransform(el.width / WIDTH, 0, 0, el.height / HEIGHT, 0, 0)
       frameTime.current = now / 1000
       puffs.current = puffs.current.filter((p) => frameTime.current - p.time < PUFF_SECONDS)
-      draw(ctx, game.current, sheet.current, distance.current, puffs.current, frameTime.current)
+      const scroll = phaseRef.current === 'playing' && !game.current.dead ? SPEED : phaseRef.current === 'ready' ? SPEED * 0.5 : 0
+      draw(ctx, game.current, head.current, looks.current, distance.current, puffs.current, frameTime.current, scroll)
       animation = requestAnimationFrame(tick)
     }
     animation = requestAnimationFrame(tick)

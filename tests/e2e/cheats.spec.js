@@ -289,3 +289,21 @@ test('typing BIGHEAD switches on Big Head Mode only, not Head Mode too', async (
   await expect(html(page)).toHaveAttribute('data-cheat-bighead', '')
   await expect(html(page)).not.toHaveAttribute('data-cheat-head', '')
 })
+
+test('switching Amber Mode on and off three times makes Amber the games’ player, and again brings Caleb back', async ({ page }) => {
+  const flipSix = async () => {
+    for (let i = 0; i < 6; i++) await toggleCheat(page, 'Amber Mode')
+  }
+  await openCheats(page)
+  await flipSix()
+  await expect(page.getByRole('status')).toContainText('Amber unlocked')
+  await expect(cheatSwitch(page, 'Amber Mode')).toHaveAttribute('aria-checked', 'false')
+  // Remembered past the session's cheats
+  await page.goto('/games/bonk')
+  await expect(page.locator('.bonk-head').first()).toHaveCSS('background-image', /amber-sprites/)
+  await openCheats(page)
+  await flipSix()
+  await expect(page.getByRole('status')).toContainText('Caleb’s back')
+  await page.goto('/games/bonk')
+  await expect(page.locator('.bonk-head').first()).toHaveCSS('background-image', /bounce-sprites/)
+})
