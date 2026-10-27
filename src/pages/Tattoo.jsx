@@ -32,16 +32,14 @@ function useScanCount() {
   return count
 }
 
-// The spinning head as a hologram: a tinted image, two colour-fringe copies, and scanlines cut to
-// the head's shape (the image's own transparency is the mask), floating over a projector.
+// The spinning head as a hologram, floating over a projector. Every effect (tint, colour fringes,
+// scanlines) is drawn on the one animated image: separate copies of an animation each keep their
+// own clock, and drifted out of step with each other.
 function Hologram({ src, width, height, alt }) {
   return (
-    <div className="tattoo-face holo" style={{ '--holo-src': `url(${src})` }}>
+    <div className="tattoo-face holo">
       <div className="holo-stack">
         <img className="holo-img" src={src} width={width} height={height} alt={alt} />
-        <span className="holo-fringe holo-fringe-pink" aria-hidden="true" />
-        <span className="holo-fringe holo-fringe-blue" aria-hidden="true" />
-        <span className="holo-lines" aria-hidden="true" />
       </div>
     </div>
   )

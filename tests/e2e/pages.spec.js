@@ -90,6 +90,21 @@ test('find me shows coordinates and a map', async ({ page }) => {
 test.describe('bouncing head on the good friend page', () => {
   test.use({ grabbableHead: true })
 
+  // Press on the head and keep holding. It keeps moving between reading where it is and pressing,
+  // so on a slow machine the press can miss: then move off (so letting go clicks nothing) and retry.
+  async function grabHead(page) {
+    const head = page.locator('.bounce-head')
+    await expect(async () => {
+      const box = await head.boundingBox()
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      await page.mouse.down()
+      if (await head.evaluate((el) => el.classList.contains('held'))) return
+      await page.mouse.move(box.x + box.width / 2 + 200, box.y + box.height / 2 + 200)
+      await page.mouse.up()
+      throw new Error('missed the head')
+    }).toPass({ timeout: 10_000 })
+  }
+
   test('bounces around, drawn as crisp pixel art', async ({ page }) => {
     await page.goto('/tattoo-good-friend')
     const head = page.locator('.bounce-head')
@@ -145,10 +160,8 @@ test.describe('bouncing head on the good friend page', () => {
     const head = page.locator('.bounce-head')
     await page.waitForTimeout(400)
     const position = () => head.evaluate((el) => { const m = new DOMMatrix(getComputedStyle(el).transform); return [m.e, m.f] })
-    // Grab it where it is right now, and carry it to the middle of the left side
-    const box = await head.boundingBox()
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    await page.mouse.down()
+    // Grab it, and carry it to the middle of the left side
+    await grabHead(page)
     const view = page.viewportSize()
     await page.mouse.move(60, view.height / 2, { steps: 10 })
     // While held it stays with the pointer
@@ -175,9 +188,7 @@ test.describe('bouncing head on the good friend page', () => {
     const start = page.getByRole('button', { name: 'Start the quiz' })
     await start.scrollIntoViewIfNeeded()
     // Carry the head over the button and put it down
-    const box = await head.boundingBox()
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
-    await page.mouse.down()
+    await grabHead(page)
     const target = await start.boundingBox()
     await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 12 })
     await page.waitForTimeout(150) // hold still, so letting go isn't a throw

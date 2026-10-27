@@ -22,6 +22,21 @@ test('the hack plays through, then waits for the visitor to continue', async ({ 
   expect(api.scanPosts).toBe(1)
 })
 
+test('the hologram is one animated image, so its effects stay in step', async ({ page }) => {
+  await openTattoo(page)
+  const holo = page.locator('.holo')
+  await expect(holo.getByRole('img', { name: /spinning, as a hologram/ })).toBeVisible()
+  // Copies of the animation (as backgrounds or masks) each keep their own clock and drift apart
+  const copies = await holo.evaluate((root) =>
+    [root, ...root.querySelectorAll('*')].filter((el) => {
+      const style = getComputedStyle(el)
+      return [style.backgroundImage, style.maskImage, style.webkitMaskImage].some((v) => v?.includes('url('))
+    }).length,
+  )
+  expect(copies).toBe(0)
+  await expect(holo.locator('img')).toHaveCount(1)
+})
+
 test('the hack can be skipped while it plays', async ({ page }) => {
   await page.goto('/tattoo')
   await expect(page.getByRole('button', { name: 'Continue' })).toHaveCount(0)

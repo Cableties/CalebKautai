@@ -899,8 +899,8 @@ html.no-scroll {
 .glitch::after {
   color: var(--blue-ink);
 }
-/* The spinning head as a hologram. Everything is cut to the head's outline: the glow follows its
-   transparency, and the scanlines use the image itself as a mask. */
+/* The spinning head as a hologram. Everything follows the head's outline: the glow and fringes are
+   shadows of its transparency, and the scanlines are a mask on the image itself. */
 .tattoo-face {
   width: min(260px, 64vw);
   margin: 0 0 24px;
@@ -928,39 +928,38 @@ html.no-scroll {
   position: relative;
   filter: drop-shadow(0 0 10px var(--holo-glow));
 }
+/* One image does it all, so nothing can fall out of step with the animation:
+   - the tint, then pink and blue copies of its outline nudged either side (the colour fringes)
+   - a mask: scanlines (stripes it shows through less), and a band without them sweeping down */
+@property --fringe-pink {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: -3px;
+}
+@property --fringe-blue {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 3px;
+}
 .holo-img {
   display: block;
   width: 100%;
-  filter: grayscale(1) sepia(1) saturate(3.5) hue-rotate(150deg) brightness(1.35) contrast(0.95);
-  opacity: 0.85;
-}
-/* Colour fringes: the same image, tinted and nudged sideways */
-.holo-fringe {
-  position: absolute;
-  inset: 0;
-  background: var(--holo-src) center / contain no-repeat;
-  opacity: 0.35;
-  pointer-events: none;
-}
-.holo-fringe-pink {
-  filter: grayscale(1) sepia(1) saturate(5) hue-rotate(290deg);
-  transform: translateX(-3px);
-}
-.holo-fringe-blue {
-  filter: grayscale(1) sepia(1) saturate(5) hue-rotate(180deg);
-  transform: translateX(3px);
-}
-/* Scanlines plus a bright band sweeping down, only where the head is */
-.holo-lines {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(to bottom, transparent 0 40%, rgb(255 255 255 / 0.45) 50%, transparent 60% 100%) 0 0 / 100% 300% no-repeat,
-    repeating-linear-gradient(to bottom, transparent 0 2px, color-mix(in srgb, var(--holo) 55%, transparent) 2px 3px);
-  -webkit-mask: var(--holo-src) center / contain no-repeat;
-  mask: var(--holo-src) center / contain no-repeat;
-  mix-blend-mode: overlay;
+  filter: grayscale(1) sepia(1) saturate(3.5) hue-rotate(168deg) brightness(1.3) contrast(0.95)
+    drop-shadow(var(--fringe-pink) 0 0 rgb(240 110 190 / 0.5)) drop-shadow(var(--fringe-blue) 0 0 rgb(80 200 255 / 0.5));
+  opacity: 0.88;
+  -webkit-mask-image:
+    linear-gradient(to bottom, transparent 0 40%, #000 50%, transparent 60% 100%),
+    repeating-linear-gradient(to bottom, #000 0 2px, rgb(0 0 0 / 0.55) 2px 3px);
+  mask-image:
+    linear-gradient(to bottom, transparent 0 40%, #000 50%, transparent 60% 100%),
+    repeating-linear-gradient(to bottom, #000 0 2px, rgb(0 0 0 / 0.55) 2px 3px);
+  -webkit-mask-size: 100% 300%, auto;
+  mask-size: 100% 300%, auto;
+  -webkit-mask-repeat: no-repeat, repeat;
+  mask-repeat: no-repeat, repeat;
+  -webkit-mask-position: 0 100%, 0 0;
+  mask-position: 0 100%, 0 0;
+  mask-composite: add;
 }
 /* Projector: a glowing disc under the head, and a faint beam rising from it */
 .holo::before {
@@ -989,14 +988,8 @@ html.no-scroll {
   .holo-stack {
     animation: holo-float 4s ease-in-out infinite, holo-flicker 5s steps(1) infinite;
   }
-  .holo-lines {
-    animation: holo-sweep 3.2s linear infinite;
-  }
-  .holo-fringe-pink {
-    animation: holo-jitter-pink 3.7s steps(1) infinite;
-  }
-  .holo-fringe-blue {
-    animation: holo-jitter-blue 3.7s steps(1) infinite;
+  .holo-img {
+    animation: holo-sweep 3.2s linear infinite, holo-jitter 3.7s steps(1) infinite;
   }
 }
 @keyframes holo-float {
@@ -1013,18 +1006,14 @@ html.no-scroll {
   88% { opacity: 1; }
 }
 @keyframes holo-sweep {
-  from { background-position: 0 100%, 0 0; }
-  to { background-position: 0 -50%, 0 0; }
+  from { -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; }
+  to { -webkit-mask-position: 0 -50%, 0 0; mask-position: 0 -50%, 0 0; }
 }
-@keyframes holo-jitter-pink {
-  0%, 100% { transform: translateX(-3px); }
-  62% { transform: translateX(-9px); }
-  65% { transform: translateX(-3px); }
-}
-@keyframes holo-jitter-blue {
-  0%, 100% { transform: translateX(3px); }
-  62% { transform: translateX(8px); }
-  65% { transform: translateX(3px); }
+/* Now and then the fringes jump apart for a moment */
+@keyframes holo-jitter {
+  0%, 100% { --fringe-pink: -3px; --fringe-blue: 3px; }
+  62% { --fringe-pink: -9px; --fringe-blue: 8px; }
+  65% { --fringe-pink: -3px; --fringe-blue: 3px; }
 }
 /* Good friend page: the waving GIF that used to be on the tattoo page */
 .friend-gif {
