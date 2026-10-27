@@ -3418,7 +3418,26 @@ a {
   line-height: 1;
 }
 .game-back {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   margin: 0 0 8px;
+}
+/* Sound effects on or off, for every game (components/SoundToggle.jsx) */
+.sound-toggle {
+  min-height: 36px;
+  padding: 0 14px;
+  font: 600 0.9rem/1 var(--body);
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.sound-toggle[aria-pressed='false'] {
+  color: var(--ink-soft);
+  border-style: dashed;
 }
 .game-back a {
   font-weight: 600;
@@ -3450,6 +3469,8 @@ a {
   user-select: none;
   -webkit-user-select: none;
   cursor: pointer;
+  /* No blue flash on a tap: each game answers a tap its own way (lib/feedback.js) */
+  -webkit-tap-highlight-color: transparent;
 }
 .game-canvas {
   display: block;
@@ -3613,6 +3634,12 @@ a {
   border-radius: 16px;
   cursor: pointer;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: scale 0.08s ease-out;
+}
+/* A tap presses the hole's turf in a little, instead of the blue flash */
+.bonk-hole:active:not(:disabled) {
+  scale: 0.96;
 }
 .bonk-hole:disabled {
   cursor: default;
@@ -3663,6 +3690,40 @@ a {
   to {
     opacity: 0;
     transform: translateY(-10px) scale(1.2);
+  }
+}
+/* Tapping an empty hole kicks up a little puff of dust */
+.bonk-dust {
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  bottom: 14%;
+  height: 22%;
+  background: radial-gradient(circle at 20% 70%, #e8f6ee 0 18%, transparent 20%),
+    radial-gradient(circle at 50% 45%, #e8f6ee 0 24%, transparent 26%),
+    radial-gradient(circle at 80% 70%, #e8f6ee 0 18%, transparent 20%);
+  opacity: 0;
+  pointer-events: none;
+}
+.bonk-hole.missed .bonk-dust {
+  animation: bonk-dust 0.3s ease-out;
+}
+@keyframes bonk-dust {
+  from {
+    opacity: 0.9;
+    transform: translateY(4px) scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-8px) scale(1.4);
+  }
+}
+@keyframes bonk-dust-fade {
+  from {
+    opacity: 0.9;
+  }
+  to {
+    opacity: 0;
   }
 }
 .bonk .game-overlay {
@@ -3726,6 +3787,9 @@ a {
   .game-overlay-hint p,
   .bonk-hole.bonked .bonk-stars {
     animation: none;
+  }
+  .bonk-hole.missed .bonk-dust {
+    animation-name: bonk-dust-fade;
   }
   .bonk-head {
     transition: none;

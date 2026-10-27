@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { POSES, TILTS, frame } from '../lib/bounce.js'
 import { GAP_MS, HOLES, ROUND_MS, nextHole, upTime } from '../lib/bonk.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
+import SoundToggle from '../components/SoundToggle.jsx'
+import { feedback } from '../lib/feedback.js'
 
 // Bonk: whack-a-mole with Caleb's pixel head. The rules are in lib/bonk.js; the holes are buttons,
 // so it works with a mouse, a finger or a keyboard.
@@ -22,6 +24,7 @@ export default function Bonk() {
   const [score, setScore] = useState(0)
   const [hole, setHole] = useState(null) // where the head is up, if anywhere
   const [bonked, setBonked] = useState(null) // the hole that was just hit, for the squash
+  const [missed, setMissed] = useState(null) // an empty hole just tapped, for a puff of dust
   const [left, setLeft] = useState(ROUND_MS)
   const [look, setLook] = useState(0) // which way the head faces this time
   const [newBest, setNewBest] = useState(false)
@@ -60,6 +63,7 @@ export default function Bonk() {
     setScore(0)
     setNewBest(false)
     setBonked(null)
+    setMissed(null)
     setLeft(ROUND_MS)
     setPhase('playing')
     started.current = Date.now()
@@ -72,6 +76,7 @@ export default function Bonk() {
       else {
         clear()
         setHole(null)
+        feedback('time')
         setPhase('over')
         setNewBest(record(scoreRef.current))
       }
@@ -80,7 +85,15 @@ export default function Bonk() {
   }
 
   function bonk(i) {
-    if (phase !== 'playing' || i !== hole) return
+    if (phase !== 'playing') return
+    if (i !== hole) {
+      // Nobody home: a whiff and a puff of dust
+      feedback('whiff')
+      setMissed(i)
+      later(() => setMissed((m) => (m === i ? null : m)), 300)
+      return
+    }
+    feedback('bonk')
     scoreRef.current++
     setScore(scoreRef.current)
     setHole(null)
@@ -94,6 +107,7 @@ export default function Bonk() {
         <Link to="/games" viewTransition>
           ← All games
         </Link>
+        <SoundToggle />
       </p>
       <h1 className="page-title">Bonk</h1>
       <p className="lede">My head pops up. You bonk it. 30 seconds, as many as you can.</p>
@@ -113,7 +127,7 @@ export default function Bonk() {
               <button
                 key={i}
                 type="button"
-                className={'bonk-hole' + (hole === i ? ' up' : '') + (bonked === i ? ' bonked' : '')}
+                className={'bonk-hole' + (hole === i ? ' up' : '') + (bonked === i ? ' bonked' : '') + (missed === i ? ' missed' : '')}
                 aria-label={hole === i ? 'Bonk the head!' : `Hole ${i + 1}`}
                 onPointerDown={(e) => (e.preventDefault(), bonk(i))}
                 onClick={(e) => e.detail === 0 && bonk(i)} // keyboard (Enter or Space)
@@ -123,6 +137,7 @@ export default function Bonk() {
                 <span className="bonk-stars" aria-hidden="true">
                   ✦ ✧ ✦
                 </span>
+                <span className="bonk-dust" aria-hidden="true" />
               </button>
             ))}
           </div>

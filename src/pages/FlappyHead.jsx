@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { SPRITE, frame } from '../lib/bounce.js'
 import { GROUND, HEAD_X, HEIGHT, PIPE_WIDTH, RADIUS, SPEED, WIDTH, facing, flap, start, step } from '../lib/flappy.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
+import SoundToggle from '../components/SoundToggle.jsx'
+import { feedback } from '../lib/feedback.js'
 
 // Flappy Head: the bouncing head's pixel-art sprites, flapping through pastel pipes. The rules are
 // in lib/flappy.js; this draws them on a canvas and handles input.
@@ -17,6 +19,14 @@ const COLOURS = {
   ground: '#bfe8d6',
   groundStripe: '#a3dcc3',
 }
+// Each flap puffs a few pixel feathers out behind the head, fanning out as they drift off with
+// the world: where each starts beside the head, and how fast it flies off (per second)
+const PUFF_SECONDS = 0.4
+const FEATHERS = [
+  [-18, 0, -90, -30],
+  [-16, 10, -110, 20],
+  [-10, 18, -50, 70],
+]
 const CLOUDS = [
   [40, 110, 26],
   [150, 70, 20],
@@ -24,7 +34,7 @@ const CLOUDS = [
   [330, 60, 18],
 ]
 
-function draw(ctx, game, sheet, distance) {
+function draw(ctx, game, sheet, distance, puffs, time) {
   const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
   sky.addColorStop(0, COLOURS.skyTop)
   sky.addColorStop(1, COLOURS.skyBottom)
@@ -77,6 +87,21 @@ function draw(ctx, game, sheet, distance) {
   ctx.lineTo(WIDTH, HEIGHT - GROUND)
   ctx.stroke()
 
+  // Feathers from recent flaps, fading as they fall away behind
+  for (const puff of puffs) {
+    const age = time - puff.time
+    ctx.globalAlpha = Math.max(0, 1 - age / PUFF_SECONDS)
+    for (const [dx, dy, vx, vy] of FEATHERS) {
+      const x = Math.round(HEAD_X + dx + (puff.distance - distance) + vx * age)
+      const y = Math.round(puff.y + dy + vy * age)
+      ctx.fillStyle = COLOURS.outline
+      ctx.fillRect(x - 1, y - 1, 10, 6)
+      ctx.fillStyle = '#fff'
+      ctx.fillRect(x, y, 8, 4)
+    }
+  }
+  ctx.globalAlpha = 1
+
   // The head: one frame of the sprite sheet, sized so the face fills the hitbox
   if (sheet.complete && sheet.naturalWidth) {
     const { row, col, mirrored } = frame(game.dead ? 70 : facing(game.vy))
@@ -114,6 +139,9 @@ export default function FlappyHead() {
   const { run, begin } = useRun(GAME)
   const phaseRef = useRef(phase)
   phaseRef.current = phase
+  const puffs = useRef([])
+  const distance = useRef(0)
+  const frameTime = useRef(0) // the animation's clock, in seconds, so puffs age in step with it
 
   const fresh = () => start({ radius: RADIUS * (document.documentElement.hasAttribute('data-cheat-bighead') ? 1.6 : 1) })
 
@@ -124,7 +152,6 @@ export default function FlappyHead() {
     game.current = fresh()
     const el = canvas.current
     const ctx = el.getContext('2d')
-    let distance = 0
     let last = performance.now()
     let animation
 
@@ -143,19 +170,25 @@ export default function FlappyHead() {
       if (phaseRef.current === 'playing') {
         const before = game.current
         game.current = step(before, dt)
-        distance += SPEED * dt
-        if (game.current.score !== before.score) setScore(game.current.score)
+        distance.current += SPEED * dt
+        if (game.current.score !== before.score) {
+          setScore(game.current.score)
+          feedback('point')
+        }
         if (game.current.dead) {
+          feedback('splat')
           setPhase('over')
           setNewBest(record(game.current.score))
         }
       } else if (phaseRef.current === 'ready') {
         // Bob gently while waiting to start
         game.current = { ...game.current, y: HEIGHT * 0.42 + Math.sin(now / 300) * 8, vy: Math.cos(now / 300) * -60 }
-        distance += SPEED * dt * 0.5
+        distance.current += SPEED * dt * 0.5
       }
       ctx.setTransform(el.width / WIDTH, 0, 0, el.height / HEIGHT, 0, 0)
-      draw(ctx, game.current, sheet.current, distance)
+      frameTime.current = now / 1000
+      puffs.current = puffs.current.filter((p) => frameTime.current - p.time < PUFF_SECONDS)
+      draw(ctx, game.current, sheet.current, distance.current, puffs.current, frameTime.current)
       animation = requestAnimationFrame(tick)
     }
     animation = requestAnimationFrame(tick)
@@ -165,16 +198,25 @@ export default function FlappyHead() {
     }
   }, [])
 
+  // A flap, with its whoop and a puff of feathers (left out for people who'd rather less motion)
+  function flapNow(g) {
+    feedback('flap')
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      puffs.current.push({ time: frameTime.current, y: g.y, distance: distance.current })
+    }
+    return flap(g)
+  }
+
   function play() {
     stage.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-    game.current = flap(fresh())
+    game.current = flapNow(fresh())
     setScore(0)
     setNewBest(false)
     setPhase('playing')
     begin()
   }
   function press() {
-    if (phaseRef.current === 'playing') game.current = flap(game.current)
+    if (phaseRef.current === 'playing') game.current = flapNow(game.current)
     else if (phaseRef.current === 'ready') play()
   }
 
@@ -195,6 +237,7 @@ export default function FlappyHead() {
         <Link to="/games" viewTransition>
           ← All games
         </Link>
+        <SoundToggle />
       </p>
       <h1 className="page-title">Flappy Head</h1>
       <p className="lede">Tap, click or press Space to flap. Don't touch the pipes.</p>

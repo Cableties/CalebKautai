@@ -21,6 +21,8 @@ import {
 	useBest,
 	useRun,
 } from "../components/Scores.jsx";
+import SoundToggle from "../components/SoundToggle.jsx";
+import { feedback } from "../lib/feedback.js";
 
 // Pinball, with Caleb's pixel head as the ball, on a choice of themed tables. The physics, rules and
 // table layouts are in lib/pinball.js; this draws them on a canvas and handles input: tap or hold
@@ -160,7 +162,21 @@ const line = (ctx, [x1, y1, x2, y2]) => {
 	ctx.stroke();
 };
 
-function draw(ctx, game, sheet, table, time) {
+// The table's sounds (and buzzes), from what changed between one frame and the next
+function effects(a, b) {
+	if (b.balls < a.balls) return feedback("drain");
+	if (b.multiplier > a.multiplier) feedback("bonus");
+	else if (b.lit.filter(Boolean).length > a.lit.filter(Boolean).length)
+		feedback("rollover");
+	if (b.held && !a.held) feedback("hole");
+	// A hit: its flash restarted (and it scored, so not a ball resting against it)
+	const hit = (before, after) =>
+		after.some((f, i) => f > before[i] && before[i] <= 0.05);
+	if (hit(a.flash.bumpers, b.flash.bumpers)) feedback("bumper");
+	if (hit(a.flash.kickers, b.flash.kickers)) feedback("kicker");
+}
+
+function draw(ctx, game, sheet, table, time, held) {
 	const theme = THEMES[table.theme];
 	const bg = ctx.createLinearGradient(0, 0, 0, HEIGHT);
 	bg.addColorStop(0, theme.bg[0]);
@@ -259,7 +275,13 @@ function draw(ctx, game, sheet, table, time) {
 		]) {
 			ctx.lineWidth = width;
 			ctx.strokeStyle = colour;
+			// A held flipper glows in the table's colours, so a tap shows on the flipper itself
+			if (held[name] && width === 11) {
+				ctx.shadowColor = theme.glow ?? theme.flipper;
+				ctx.shadowBlur = 14;
+			}
 			line(ctx, [f.x, f.y, tx, ty]);
+			ctx.shadowBlur = 0;
 		}
 	}
 
@@ -351,8 +373,10 @@ export default function Pinball() {
 			last = now;
 			const t = tableRef.current;
 			if (phaseRef.current === "playing") {
-				game.current = step(game.current, dt, held.current, t);
+				const before = game.current;
+				game.current = step(before, dt, held.current, t);
 				const g = game.current;
+				effects(before, g);
 				// Compared with what's on screen, not the last frame: a launch happens between frames
 				const shown = hudRef.current;
 				if (
@@ -382,7 +406,7 @@ export default function Pinball() {
 				);
 			}
 			ctx.setTransform(el.width / WIDTH, 0, 0, el.height / HEIGHT, 0, 0);
-			draw(ctx, game.current, sheet, t, now / 1000);
+			draw(ctx, game.current, sheet, t, now / 1000, held.current);
 			animation = requestAnimationFrame(tick);
 		}
 		animation = requestAnimationFrame(tick);
@@ -402,7 +426,14 @@ export default function Pinball() {
 	}
 	function fire() {
 		if (phaseRef.current === "ready") play();
-		if (phaseRef.current !== "over") game.current = launch(game.current);
+		if (phaseRef.current === "over") return;
+		if (game.current.inLane) feedback("launch");
+		game.current = launch(game.current);
+	}
+	// Raise a flipper, with a click as it goes up (not again while it's held)
+	function hold(side, on) {
+		if (on && !held.current[side]) feedback("flip");
+		held.current = { ...held.current, [side]: on };
 	}
 
 	// Each finger holds the flipper on its side of the table; a tap also launches a waiting ball
@@ -412,7 +443,7 @@ export default function Pinball() {
 		const box = stage.current.getBoundingClientRect();
 		const side = e.clientX - box.left < box.width / 2 ? "left" : "right";
 		pointers.current.set(e.pointerId, side);
-		held.current = { ...held.current, [side]: true };
+		hold(side, true);
 		if (game.current.inLane) fire();
 	}
 	function up(e) {
@@ -420,7 +451,7 @@ export default function Pinball() {
 		if (!side) return;
 		pointers.current.delete(e.pointerId);
 		if (![...pointers.current.values()].includes(side))
-			held.current = { ...held.current, [side]: false };
+			hold(side, false);
 	}
 
 	useEffect(() => {
@@ -433,7 +464,7 @@ export default function Pinball() {
 					: null;
 			if (side) {
 				e.preventDefault();
-				held.current = { ...held.current, [side]: e.type === "keydown" };
+				hold(side, e.type === "keydown");
 			} else if (LAUNCH_KEYS.includes(e.key) && e.type === "keydown") {
 				e.preventDefault();
 				fire();
@@ -454,6 +485,7 @@ export default function Pinball() {
 				<Link to="/games" viewTransition>
 					← All games
 				</Link>
+				<SoundToggle />
 			</p>
 			<h1 className="page-title">Pinball</h1>
 			<p className="lede">

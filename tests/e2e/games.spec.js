@@ -218,3 +218,106 @@ test.describe("Bonk", () => {
 		);
 	});
 });
+
+test.describe("tap feedback", () => {
+	// Records each buzz and each sound effect note, so the test can see them
+	test.beforeEach(async ({ page }) => {
+		await page.addInitScript(() => {
+			window.buzzes = [];
+			window.notes = 0;
+			Object.defineProperty(navigator, "vibrate", {
+				value: (pattern) => (window.buzzes.push(pattern), true),
+			});
+			const Context = window.AudioContext ?? window.webkitAudioContext;
+			if (Context) {
+				for (const make of ["createOscillator", "createBufferSource"]) {
+					const original = Context.prototype[make];
+					Context.prototype[make] = function (...args) {
+						window.notes++;
+						return original.apply(this, args);
+					};
+				}
+			}
+		});
+	});
+	const buzzes = (page) => page.evaluate(() => window.buzzes.length);
+	const notes = (page) => page.evaluate(() => window.notes);
+	// Playwright's WebKit on Windows has no Web Audio (a real iPhone does), so sound is only checked
+	// where there is some
+	const hasAudio = (page) =>
+		page.evaluate(() => !!(window.AudioContext ?? window.webkitAudioContext));
+
+	for (const [path, surface] of [
+		["/games/flappy-head", ".game-stage"],
+		["/games/pinball", ".pinball-stage"],
+		["/games/bonk", ".bonk-hole"],
+	]) {
+		test(`${path}: no blue flash on a tap`, async ({ page, browserName }) => {
+			// Only Chromium's test build reports the tap highlight
+			test.skip(browserName !== "chromium");
+			await page.goto(path);
+			const colour = await page
+				.locator(surface)
+				.first()
+				.evaluate((el) => getComputedStyle(el).webkitTapHighlightColor);
+			expect(colour).toBe("rgba(0, 0, 0, 0)");
+		});
+	}
+
+	test("Flappy Head: each flap buzzes and whoops", async ({ page }) => {
+		await page.goto("/games/flappy-head");
+		await page.keyboard.press("Space");
+		await page.keyboard.press("Space");
+		await expect.poll(() => buzzes(page)).toBe(2);
+		if (await hasAudio(page)) expect(await notes(page)).toBeGreaterThan(0);
+	});
+
+	test("Bonk: a hit thunks, and an empty hole whiffs with a puff of dust", async ({
+		page,
+	}) => {
+		await page.clock.install();
+		await page.goto("/games/bonk");
+		await page.getByRole("button", { name: "Start" }).click();
+		await page.clock.runFor(450);
+		await page.getByRole("button", { name: "Bonk the head!" }).click();
+		await expect.poll(() => page.evaluate(() => window.buzzes)).toEqual([18]);
+		const empty = page.getByRole("button", { name: /^Hole / }).first();
+		await empty.click();
+		await expect(empty).toHaveClass(/missed/);
+		await expect.poll(() => page.evaluate(() => window.buzzes)).toEqual([18, 5]);
+		if (await hasAudio(page)) expect(await notes(page)).toBeGreaterThan(0);
+	});
+
+	test("Pinball: the plunger and flippers buzz and click", async ({ page }) => {
+		await page.goto("/games/pinball");
+		await expect(page.locator(".pinball-stage")).toBeVisible();
+		await page.keyboard.press("Space");
+		await page.keyboard.down("ArrowLeft");
+		await page.keyboard.up("ArrowLeft");
+		// (then the ball may well hit something and buzz again)
+		await expect
+			.poll(() => page.evaluate(() => window.buzzes.slice(0, 2)))
+			.toEqual([20, 6]);
+		if (await hasAudio(page)) expect(await notes(page)).toBeGreaterThan(0);
+	});
+
+	test("sound can be switched off, for every game, and stays off", async ({
+		page,
+	}) => {
+		await page.goto("/games/flappy-head");
+		const sound = page.getByRole("button", { name: "Sound" });
+		await expect(sound).toHaveAttribute("aria-pressed", "true");
+		await sound.click();
+		await expect(sound).toHaveAttribute("aria-pressed", "false");
+		// A tap on the game (Space would press the Sound button again, as it has focus)
+		await page.locator(".game-stage").click();
+		await expect.poll(() => buzzes(page)).toBe(1);
+		// Still buzzes, but silently
+		if (await hasAudio(page)) expect(await notes(page)).toBe(0);
+		await page.goto("/games/bonk");
+		await expect(page.getByRole("button", { name: "Sound" })).toHaveAttribute(
+			"aria-pressed",
+			"false",
+		);
+	});
+});
