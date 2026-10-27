@@ -68,6 +68,8 @@ test('find me shows coordinates and a map', async ({ page }) => {
 })
 
 test.describe('bouncing head on the good friend page', () => {
+  test.use({ grabbableHead: true })
+
   test('bounces around, drawn as crisp pixel art', async ({ page }) => {
     await page.goto('/tattoo-good-friend')
     const head = page.locator('.bounce-head')
@@ -144,6 +146,28 @@ test.describe('bouncing head on the good friend page', () => {
     const [x1] = await position()
     // Far faster than its 140px/s cruise (which would cover ~21px in that time)
     expect(Math.abs(x1 - x0)).toBeGreaterThan(60)
+  })
+
+  test('a quick tap on the head goes through to the button underneath', async ({ page }) => {
+    await page.goto('/tattoo-good-friend')
+    await page.waitForTimeout(400)
+    const head = page.locator('.bounce-head')
+    const start = page.getByRole('button', { name: 'Start the quiz' })
+    await start.scrollIntoViewIfNeeded()
+    // Carry the head over the button and put it down
+    const box = await head.boundingBox()
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+    await page.mouse.down()
+    const target = await start.boundingBox()
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps: 12 })
+    await page.waitForTimeout(150) // hold still, so letting go isn't a throw
+    await page.mouse.up()
+    // Now tap the head where it sits on the button
+    const over = await head.boundingBox()
+    const tapAt = { x: target.x + target.width / 2, y: target.y + target.height / 2 }
+    expect(tapAt.x > over.x && tapAt.x < over.x + over.width && tapAt.y > over.y && tapAt.y < over.y + over.height).toBe(true)
+    await page.mouse.click(tapAt.x, tapAt.y)
+    await expect(page.getByText(/Question 1 of/)).toBeVisible()
   })
 
   test('is left out for reduced motion', async ({ page }) => {

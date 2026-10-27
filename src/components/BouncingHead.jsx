@@ -7,6 +7,10 @@ import { POSES, SPRITE, TILTS, frame, nudge, release, step } from '../lib/bounce
 // writes it straight to the DOM, without re-rendering.
 const SHEET = '/images/bounce-sprites.png'
 const THROW_WINDOW = 90 // ms of pointer movement to measure a throw's speed from
+// A press that barely moves and lets go quickly is a tap, not a grab: it goes through to whatever
+// the head is floating over, so the head never blocks a button or link
+const TAP_PX = 8
+const TAP_MS = 350
 
 // Whole-number scaling keeps every art pixel the same size on screen. Big Head Mode doubles it.
 const pixelSize = () =>
@@ -77,7 +81,7 @@ export default function BouncingHead({ chosen = false }) {
     head.current.setPointerCapture(e.pointerId)
     const [px, py] = pointerAt(e)
     const s = state.current
-    held.current = { dx: px - s.x, dy: py - s.y, samples: [[performance.now(), px, py]] }
+    held.current = { dx: px - s.x, dy: py - s.y, samples: [[performance.now(), px, py]], start: [performance.now(), e.clientX, e.clientY] }
     head.current.classList.add('held')
   }
 
@@ -97,17 +101,33 @@ export default function BouncingHead({ chosen = false }) {
     hold.samples = [...hold.samples, [now, px, py]].filter(([t]) => now - t <= THROW_WINDOW)
   }
 
-  function letGo() {
+  function letGo(e) {
     const hold = held.current
     if (!hold) return
     held.current = null
     head.current.classList.remove('held')
+    const [t0, x0, y0] = hold.start
+    if (e.type === 'pointerup' && performance.now() - t0 < TAP_MS && Math.hypot(e.clientX - x0, e.clientY - y0) < TAP_PX) {
+      passTapThrough(e.clientX, e.clientY)
+      return
+    }
     // Throw speed: how far the pointer moved over the last few moments
     const [first, latest] = [hold.samples[0], hold.samples.at(-1)]
     const seconds = Math.max((latest[0] - first[0]) / 1000, 0.001)
     const recent = performance.now() - latest[0] < THROW_WINDOW
     const [vx, vy] = recent ? [(latest[1] - first[1]) / seconds, (latest[2] - first[2]) / seconds] : [0, 0]
     state.current = release(state.current, vx, vy)
+  }
+
+  // Click whatever is under the head at that point, as if the head weren't there
+  function passTapThrough(x, y) {
+    const el = head.current
+    el.style.pointerEvents = 'none'
+    const under = document.elementFromPoint(x, y)
+    el.style.pointerEvents = ''
+    if (!under) return
+    if (under.matches('input, textarea, select')) under.focus()
+    under.click()
   }
 
   if (!on) return null

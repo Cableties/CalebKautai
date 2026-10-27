@@ -400,9 +400,32 @@ p {
   margin: 0;
   padding: 0;
   display: grid;
-  /* Six cards: 3 × 2 on desktop, 2 × 3 on tablets, one column on phones */
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  /* One column on phones, two on tablets, three on desktop. A card left alone on the last row
+     stretches across it, so the grid always ends tidily. */
+  grid-template-columns: 1fr;
   gap: 16px;
+}
+@media (min-width: 700px) {
+  .cards {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cards li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+}
+@media (min-width: 1024px) {
+  .cards {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .cards li:last-child:nth-child(odd) {
+    grid-column: auto;
+  }
+  .cards li:last-child:nth-child(3n + 1) {
+    grid-column: 1 / -1;
+  }
+  .cards li:last-child:nth-child(3n + 2) {
+    grid-column: span 2;
+  }
 }
 .cards li {
   --card: var(--pink);
@@ -2693,4 +2716,366 @@ a {
 }
 .bounce-head.held {
   cursor: grabbing;
+}
+
+/* ---------- Decision wheel (pages/DecisionWheel.jsx) ---------- */
+:root {
+  --wheel-0: #f7b6d2;
+  --wheel-1: #a9d4f2;
+  --wheel-2: #bfe8d6;
+  --wheel-3: #d9ccf5;
+  --wheel-4: #fdeca0;
+  --wheel-5: #ffc9a8;
+  --wheel-6: #a8e6e1;
+  --wheel-7: #f5a3b5;
+}
+.wheel-builder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 420px);
+  gap: 32px 48px;
+  align-items: start;
+  margin-top: 32px;
+}
+@media (max-width: 860px) {
+  .wheel-builder {
+    grid-template-columns: 1fr;
+  }
+  .wheel-preview {
+    order: -1;
+  }
+}
+.wheel-question {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
+  font-weight: 700;
+}
+.wheel-question input {
+  font-size: 1.15rem;
+}
+.wheel-options {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.wheel-options li {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr) auto 3rem 36px;
+  align-items: center;
+  gap: 10px;
+}
+.wheel-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.wheel-options input {
+  width: 100%;
+}
+.wheel-weight {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.wheel-weight button {
+  width: 34px;
+  height: 38px;
+  font: 700 1.1rem/1 var(--body);
+  color: var(--ink);
+  background: var(--paper);
+  border: 0;
+  cursor: pointer;
+}
+.wheel-weight button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.wheel-weight output {
+  min-width: 26px;
+  text-align: center;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.wheel-chance {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.wheel-remove {
+  width: 36px;
+  height: 36px;
+  font-size: 1.4rem;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.wheel-remove:hover {
+  color: var(--pink-ink);
+  background: var(--paper-2);
+}
+.wheel-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+}
+.wheel-reset {
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-soft);
+  background: none;
+  border: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.wheel-preview {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+}
+.wheel-preview .wheel {
+  width: min(380px, 100%);
+}
+.wheel {
+  display: block;
+  overflow: visible;
+}
+.wheel text {
+  fill: #2e2a45;
+  font-family: var(--display);
+  font-weight: 800;
+  pointer-events: none;
+}
+.wheel-turn {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.12, 0.6, 0.08, 1);
+}
+.wheel path,
+.wheel circle:not(.wheel-rim):not(.wheel-hub) {
+  stroke: #fff;
+  stroke-width: 1.2;
+}
+.wheel-rim {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 3;
+}
+.wheel-hub {
+  fill: var(--ink);
+  stroke: var(--paper);
+  stroke-width: 3;
+}
+/* The big spin button */
+.wheel-spin {
+  min-width: 220px;
+  padding: 20px 40px;
+  font: 800 clamp(1.6rem, 6vw, 2.2rem) / 1 var(--display);
+  letter-spacing: 0.08em;
+  color: var(--paper);
+  background: var(--pink-ink);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 6px 0 color-mix(in srgb, var(--pink-ink) 60%, #000), 0 14px 30px -12px var(--pink-ink);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+.wheel-spin:active:not(:disabled) {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--pink-ink) 60%, #000), 0 8px 20px -12px var(--pink-ink);
+}
+.wheel-spin:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.wheel-hint {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+/* Full screen while it spins */
+.wheel-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 115;
+  display: grid;
+  /* Question, wheel, result: the wheel gets whatever height is left, and sizes itself to fit */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  justify-items: center;
+  gap: 12px;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(20px, env(safe-area-inset-bottom));
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--pink) 45%, transparent), transparent 60%),
+    var(--paper);
+  animation: appear 0.25s ease-out both;
+}
+.wheel-stage-top {
+  /* In the corners, out of the way of the wheel's height */
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  z-index: 2;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.wheel-stage-top button {
+  pointer-events: auto;
+}
+.wheel-mute,
+.wheel-close {
+  width: 48px;
+  height: 48px;
+  font-size: 1.6rem;
+  color: var(--ink);
+  background: var(--paper-2);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.wheel-stage-question {
+  margin: 0;
+  /* Clear of the corner buttons */
+  padding: 4px 56px 0;
+  font-size: clamp(1.6rem, 4.5vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.1;
+  text-align: center;
+}
+/* Each part keeps its row, even when there's no question */
+.wheel-stage-question {
+  grid-row: 1;
+}
+.wheel-stage-cell {
+  grid-row: 2;
+  justify-self: stretch;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  container-type: size;
+}
+.wheel-result {
+  grid-row: 3;
+}
+/* The biggest square that fits the cell; the top strip is the pointer's */
+.wheel-stage-wheel {
+  position: relative;
+  box-sizing: border-box;
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+  padding-top: 26px;
+}
+.wheel-stage-wheel .wheel {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 18px 30px rgb(0 0 0 / 0.25));
+}
+/* The pointer at the top, which flicks as each slice goes by */
+.wheel-pointer {
+  position: absolute;
+  /* Its tip 12px inside the rim: the wheel starts 26px down (the pointer's strip), and the rim is
+     10/220 of the wheel's size in from there */
+  top: calc(26px + (100% - 26px) * 10 / 220 - 28px);
+  left: 50%;
+  z-index: 1;
+  width: 30px;
+  height: 40px;
+  margin-left: -15px;
+  background: var(--ink);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transform-origin: 50% 0;
+  filter: drop-shadow(0 3px 3px rgb(0 0 0 / 0.3));
+}
+.wheel-result {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  min-height: 120px;
+  text-align: center;
+}
+.wheel-spinning {
+  margin: 0;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.wheel-winner {
+  margin: 0;
+  font: 800 clamp(2.2rem, 9vw, 4rem) / 1 var(--display);
+  color: var(--pink-ink);
+  animation: winner 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+@keyframes winner {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+.wheel-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+@media (max-width: 480px) {
+  .wheel-options li {
+    grid-template-columns: 12px minmax(0, 1fr) auto 32px;
+  }
+  .wheel-chance {
+    display: none;
+  }
+}
+
+/* Confetti for the winner */
+.confetti {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.confetti span {
+  position: absolute;
+  top: -20px;
+  border-radius: 2px;
+  animation: confetti 2.4s cubic-bezier(0.25, 0.6, 0.4, 1) forwards;
+}
+@keyframes confetti {
+  to {
+    transform: translate(var(--drift), 105dvh) rotate(var(--spin));
+    opacity: 0.9;
+  }
+}
+
+/* Preset buttons above the question */
+.wheel-presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.wheel-presets span {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.wheel-presets button {
+  min-height: 38px;
+  padding: 0 16px;
+  font: 600 0.95rem/1 var(--body);
+  color: var(--ink);
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.wheel-presets button:hover {
+  border-color: var(--pink-ink);
 }

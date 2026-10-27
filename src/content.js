@@ -115,6 +115,7 @@ export const nav = [
 	{ to: "/aliens", label: "Aliens!" },
 	{ to: "/find-me", label: "Find me" },
 	{ to: "/cheat-codes", label: "Cheat codes" },
+	{ to: "/decision-wheel", label: "Decision wheel" },
 ];
 
 export const intro =
@@ -140,6 +141,11 @@ export const thingsToDo = [
 		to: "/cheat-codes",
 		label: "Cheat codes",
 		note: "Head Mode, Dance Mode, Australia Mode… use responsibly.",
+	},
+	{
+		to: "/decision-wheel",
+		label: "Decision wheel",
+		note: "Can't decide? Let the wheel do it. Weighted, obviously.",
 	},
 	{
 		to: "/find-me",
@@ -204,6 +210,10 @@ export const pageMeta = {
 	"/cotg-submission": {
 		title: "CoTG",
 		description: "Submissions aren't open yet.",
+	},
+	"/decision-wheel": {
+		title: "Decision wheel",
+		description: "Can't decide? Put in the options, weight them, and spin.",
 	},
 	"/cheat-codes": {
 		title: "Cheat codes",

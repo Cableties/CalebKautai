@@ -5,6 +5,25 @@ import { test as base, expect } from '@playwright/test'
 // - external embeds stubbed, so tests don't depend on Google being reachable
 // - a check that the page logged no errors of its own
 export const test = base.extend({
+  // The bouncing head can be grabbed, so it catches pointer events. For people a quick tap passes
+  // through it, but Playwright won't click anything another element covers, so in tests that aren't
+  // about the head it's made see-through to the pointer. Head tests switch this on.
+  grabbableHead: [false, { option: true }],
+  headPassThrough: [
+    async ({ page, grabbableHead }, use) => {
+      if (!grabbableHead) {
+        await page.addInitScript(() =>
+          document.addEventListener('DOMContentLoaded', () => {
+            const style = document.createElement('style')
+            style.textContent = '.bounce-head { pointer-events: none !important; }'
+            document.head.append(style)
+          }),
+        )
+      }
+      await use()
+    },
+    { auto: true },
+  ],
   api: [
     async ({ page }, use) => {
       const api = {
