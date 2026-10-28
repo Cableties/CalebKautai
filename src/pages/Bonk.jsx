@@ -6,6 +6,7 @@ import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.js
 import SoundToggle from '../components/SoundToggle.jsx'
 import { feedback } from '../lib/feedback.js'
 import { useCheats } from '../components/Cheats.jsx'
+import { cheatOn } from '../lib/gameHead.js'
 
 // Bonk: whack-a-mole with Caleb's pixel head. The rules are in lib/bonk.js; the holes are buttons,
 // so it works with a mouse, a finger or a keyboard.
@@ -50,6 +51,7 @@ export default function Bonk() {
   const board = useRef(null)
   const started = useRef(0)
   const scoreRef = useRef(0)
+  const easy = useRef(false) // Easy Mode, as it was when this round started
   const { player } = useCheats()
 
   const later = (fn, ms) => timers.current.push(setTimeout(fn, ms))
@@ -65,7 +67,7 @@ export default function Bonk() {
     const next = nextHole(previous)
     setHole(next)
     setFacing([0, 180, -20, 200][Math.floor(Math.random() * 4)])
-    const stay = upTime(elapsed)
+    const stay = upTime(elapsed, easy.current)
     later(() => {
       setHole((h) => (h === next ? null : h))
       later(() => popUp(next), GAP_MS)
@@ -83,6 +85,7 @@ export default function Bonk() {
     setLeft(ROUND_MS)
     setPhase('playing')
     started.current = Date.now()
+    easy.current = cheatOn('easy')
     begin()
     later(() => popUp(null), 400)
     const tick = () => {
@@ -94,7 +97,7 @@ export default function Bonk() {
         setHole(null)
         feedback('time')
         setPhase('over')
-        setNewBest(record(scoreRef.current))
+        setNewBest(!easy.current && record(scoreRef.current))
       }
     }
     later(tick, 100)
@@ -166,7 +169,7 @@ export default function Bonk() {
                     Score: <strong>{score}</strong>
                     {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
                   </p>
-                  <ScoreEntry game={GAME} score={score} run={run} onSaved={setScores} />
+                  <ScoreEntry game={GAME} score={score} run={run} easy={easy.current} onSaved={setScores} />
                 </>
               ) : (
                 <h2>Ready?</h2>

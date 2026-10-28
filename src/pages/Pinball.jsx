@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { HEADS } from "../lib/bounce.js";
-import { gameHead } from "../lib/gameHead.js";
+import { cheatOn, gameHead } from "../lib/gameHead.js";
 import {
 	BALL,
 	BALLS,
@@ -391,7 +391,7 @@ export default function Pinball() {
 				}
 				if (g.over) {
 					setPhase("over");
-					setNewBest(recordRef.current(g.score));
+					setNewBest(!g.easy && recordRef.current(g.score));
 				}
 			} else if (phaseRef.current === "ready") {
 				// Flippers still move before the first launch, to try them out
@@ -423,8 +423,8 @@ export default function Pinball() {
 
 	function play() {
 		stage.current?.scrollIntoView({ block: "center", behavior: "smooth" });
-		game.current = start(tableRef.current);
-		setHud(fresh);
+		game.current = start(tableRef.current, { easy: cheatOn("easy") });
+		setHud({ ...fresh, balls: game.current.balls });
 		setNewBest(false);
 		setPhase("playing");
 		begin();
@@ -483,7 +483,8 @@ export default function Pinball() {
 		};
 	}, []);
 
-	const ball = Math.min(BALLS, BALLS - hud.balls + 1);
+	const total = game.current?.total ?? BALLS; // one more in Easy Mode
+	const ball = Math.min(total, total - hud.balls + 1);
 	return (
 		<article className="page game-page">
 			<p className="game-back">
@@ -527,7 +528,7 @@ export default function Pinball() {
 							<span className="pinball-multiplier">×{hud.multiplier}</span>
 						)}
 						<span>
-							Ball <strong>{ball}</strong> of {BALLS}
+							Ball <strong>{ball}</strong> of {total}
 						</span>
 					</p>
 					<div
@@ -572,6 +573,7 @@ export default function Pinball() {
 									game={GAME}
 									score={hud.score}
 									run={run}
+									easy={game.current?.easy}
 									onSaved={setScores}
 								/>
 								<button type="button" className="button" onClick={play}>

@@ -14,6 +14,8 @@ export const WIDTH = 360
 export const HEIGHT = 640
 export const BALL = 11 // radius
 export const BALLS = 3 // per game
+// Easy Mode (a secret cheat): an extra ball, and the table tilted a little less
+const EASY = { balls: 1, gravity: 0.9 }
 const GRAVITY = 820 // the table's tilt
 const MAX_SPEED = 1500
 const SUBSTEPS = 10
@@ -189,7 +191,7 @@ export const TABLES = [
 ]
 export const tableById = (id) => TABLES.find((t) => t.id === id) ?? TABLES[0]
 
-export function start(t = TABLES[0]) {
+export function start(t = TABLES[0], { easy = false } = {}) {
   return {
     table: t.id,
     ball: { ...LAUNCH_SPOT, vx: 0, vy: 0 },
@@ -199,7 +201,9 @@ export function start(t = TABLES[0]) {
       right: { angle: flipperAngle(-1, false), spin: 0 },
     },
     score: 0,
-    balls: BALLS, // left, including the one in play
+    balls: BALLS + (easy ? EASY.balls : 0), // left, including the one in play
+    total: BALLS + (easy ? EASY.balls : 0),
+    easy,
     lit: t.rollovers.map(() => false),
     rolling: null, // the top lane the ball is in right now, so it lights once on the way in
     multiplier: 1,
@@ -286,7 +290,7 @@ export function step(state, dt, held = {}, t = tableById(state.table)) {
       s.cooldown = HOLE.cooldown
     }
 
-    b.vy += GRAVITY * h
+    b.vy += GRAVITY * (s.easy ? EASY.gravity : 1) * h
     const speed = Math.hypot(b.vx, b.vy)
     if (speed > MAX_SPEED) {
       b.vx *= MAX_SPEED / speed

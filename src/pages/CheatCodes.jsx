@@ -14,7 +14,7 @@ export default function CheatCodes() {
       </p>
 
       <ul className="cheat-list">
-        {CHEATS.map((cheat) => {
+        {CHEATS.filter((c) => !c.hidden).map((cheat) => {
           const on = isOn(cheat.id)
           return (
             <li key={cheat.id} className={on ? 'on' : ''}>

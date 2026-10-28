@@ -8,9 +8,12 @@ export const GAP_MS = 180 // between one head going down and the next coming up
 // The most anyone could score: every head bonked the moment it shows. The server checks against it.
 export const MAX_SCORE = Math.ceil(ROUND_MS / (UP_MS.end / 3 + GAP_MS))
 
-export function upTime(elapsed) {
+// Easy Mode (a secret cheat) keeps each head up this much longer
+export const EASY_UP = 1.3
+
+export function upTime(elapsed, easy = false) {
   const t = Math.min(1, Math.max(0, elapsed / ROUND_MS))
-  return Math.round(UP_MS.start + (UP_MS.end - UP_MS.start) * t)
+  return Math.round((UP_MS.start + (UP_MS.end - UP_MS.start) * t) * (easy ? EASY_UP : 1))
 }
 
 // A different hole from the last one, so it never looks like it didn't move

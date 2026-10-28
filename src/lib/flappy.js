@@ -14,21 +14,23 @@ export const PIPE_WIDTH = 66
 export const SPACING = 220 // from one pipe to the next
 const GAP = { start: 176, min: 136, shrink: 2 } // the opening narrows by `shrink` per point
 const EDGE = 64 // keep openings at least this far from the top and the ground
+// Easy Mode (a secret cheat): openings this much wider, and a gentler fall
+const EASY = { gap: 28, gravity: 0.88 }
 
 // Seconds between pipes, so the server can tell a real score from a made-up one
 export const SECONDS_PER_PIPE = SPACING / SPEED
 
-export const gapFor = (score) => Math.max(GAP.min, GAP.start - score * GAP.shrink)
+export const gapFor = (score, easy = false) => Math.max(GAP.min, GAP.start - score * GAP.shrink) + (easy ? EASY.gap : 0)
 
-export function pipe(x, score, random = Math.random) {
-  const gap = gapFor(score)
+export function pipe(x, score, random = Math.random, easy = false) {
+  const gap = gapFor(score, easy)
   const top = EDGE + gap / 2
   const bottom = HEIGHT - GROUND - EDGE - gap / 2
   return { x, gapY: top + random() * (bottom - top), gap, scored: false }
 }
 
-export function start({ radius = RADIUS } = {}, random = Math.random) {
-  return { y: HEIGHT * 0.42, vy: 0, radius, score: 0, dead: false, pipes: [pipe(WIDTH + 80, 0, random)] }
+export function start({ radius = RADIUS, easy = false } = {}, random = Math.random) {
+  return { y: HEIGHT * 0.42, vy: 0, radius, easy, score: 0, dead: false, pipes: [pipe(WIDTH + 80, 0, random, easy)] }
 }
 
 export const flap = (state) => (state.dead ? state : { ...state, vy: FLAP })
@@ -43,7 +45,7 @@ export function hits(cx, cy, r, x, y, w, h) {
 // One frame. Returns the new state; `dead` once it hits a pipe or the ground.
 export function step(state, dt, random = Math.random) {
   if (state.dead) return state
-  const vy = Math.min(MAX_FALL, state.vy + GRAVITY * dt)
+  const vy = Math.min(MAX_FALL, state.vy + GRAVITY * (state.easy ? EASY.gravity : 1) * dt)
   // The sky has a lid: bumping it stops the climb rather than ending the game
   let y = state.y + vy * dt
   const ceiling = state.radius
@@ -59,7 +61,7 @@ export function step(state, dt, random = Math.random) {
       return { ...p, scored: true }
     })
   const last = pipes.at(-1)
-  if (!last || last.x <= WIDTH - SPACING) pipes = [...pipes, pipe((last?.x ?? WIDTH) + SPACING, score, random)]
+  if (!last || last.x <= WIDTH - SPACING) pipes = [...pipes, pipe((last?.x ?? WIDTH) + SPACING, score, random, state.easy)]
 
   const r = state.radius
   const crashed =

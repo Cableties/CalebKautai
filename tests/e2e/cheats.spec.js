@@ -14,7 +14,7 @@ async function openCheats(page) {
 
 test('each cheat switches on and off from the cheat codes page', async ({ page }) => {
   await openCheats(page)
-  for (const { name, id } of CHEATS) {
+  for (const { name, id } of CHEATS.filter((c) => !c.hidden)) {
     const attr = `data-cheat-${id}`
     const sw = cheatSwitch(page, name)
     await expect(sw).toHaveAttribute('aria-checked', 'false')
@@ -280,6 +280,27 @@ test('the Konami code has a Run button for phones', async ({ page }) => {
   await page.goto('/cheat-codes')
   await page.getByRole('button', { name: 'Run' }).click()
   await expect(page.getByRole('dialog', { name: /hacking in progress/i })).toBeVisible()
+})
+
+test('Easy Mode is a secret: not on the cheat codes page, but EZPZ switches it on', async ({ page }) => {
+  await openCheats(page)
+  await expect(cheatSwitch(page, 'Easy Mode')).toHaveCount(0)
+  test.skip(test.info().project.name === 'iphone', 'phones have no keyboard to type on')
+  await page.keyboard.type('ezpz')
+  await expect(html(page)).toHaveAttribute('data-cheat-easy', '')
+  await expect(page.getByRole('status')).toContainText('Easy Mode activated')
+})
+
+test('on a phone, four quick taps on the Games heading switch Easy Mode on and off', async ({ page }) => {
+  await page.goto('/games')
+  const heading = page.getByRole('heading', { name: 'Games', level: 1 })
+  for (let i = 0; i < 4; i++) await heading.click()
+  await expect(html(page)).toHaveAttribute('data-cheat-easy', '')
+  await page.getByRole('link', { name: /Bonk/ }).click()
+  await expect(page.getByText('Easy mode', { exact: true })).toBeVisible()
+  await page.goBack()
+  for (let i = 0; i < 4; i++) await page.getByRole('heading', { name: 'Games', level: 1 }).click()
+  await expect(html(page)).not.toHaveAttribute('data-cheat-easy', '')
 })
 
 test('typing BIGHEAD switches on Big Head Mode only, not Head Mode too', async ({ page }) => {

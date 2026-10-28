@@ -3573,6 +3573,21 @@ a {
   margin: 0 0 8px;
 }
 /* Sound effects on or off, for every game (components/SoundToggle.jsx) */
+.game-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+/* The secret Easy Mode cheat is on */
+.easy-badge {
+  padding: 6px 10px;
+  font: 700 0.75rem/1 var(--body);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--mint);
+  border-radius: 999px;
+}
 .sound-toggle {
   min-height: 36px;
   padding: 0 14px;
@@ -3619,6 +3634,10 @@ a {
   cursor: pointer;
   /* No blue flash on a tap: each game answers a tap its own way (lib/feedback.js) */
   -webkit-tap-highlight-color: transparent;
+}
+/* Snake and Invaders: a finger dragging on the screen steers, rather than scrolling the page */
+.swipe-stage {
+  touch-action: none;
 }
 .game-canvas {
   display: block;
@@ -3895,6 +3914,49 @@ a {
   border-radius: 17px;
 }
 /* Pinball: pick a table, each in its own colours */
+/* Game settings (Snake's walls, obstacles and portals): switches with a tick when on */
+.game-settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+}
+.game-setting {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px 0 12px;
+  font: 600 0.95rem/1 var(--body);
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.game-setting::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--ink-soft);
+  border-radius: 5px;
+}
+.game-setting[aria-checked='true'] {
+  border-color: var(--ink);
+}
+.game-setting[aria-checked='true']::before {
+  content: '✓';
+  display: grid;
+  place-items: center;
+  font-size: 0.75rem;
+  color: var(--paper);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.game-setting:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
 .pinball-tables {
   display: flex;
   flex-wrap: wrap;

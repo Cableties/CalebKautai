@@ -1,0 +1,317 @@
+import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { HEADS } from '../lib/bounce.js'
+import { cheatOn, gameHead } from '../lib/gameHead.js'
+import { BLOCK, FLEET, HEIGHT, PLAYER, SAUCER, WIDTH, alienAt, start, step } from '../lib/invaders.js'
+import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
+import SoundToggle from '../components/SoundToggle.jsx'
+import { useCheats } from '../components/Cheats.jsx'
+import { feedback } from '../lib/feedback.js'
+
+// Invaders: pixel aliens march down on the head, riding a cannon along the bottom. The other head
+// flies over now and then in a saucer, for bonus points. The rules are in lib/invaders.js; this
+// draws them on a canvas and handles input: hold a finger down to slide and fire, or the arrow keys
+// and Space.
+const GAME = 'invaders'
+const LEFT_KEYS = ['ArrowLeft', 'a', 'A']
+const RIGHT_KEYS = ['ArrowRight', 'd', 'D']
+const FIRE_KEYS = [' ', 'ArrowUp', 'w', 'W']
+const HUD = 44 // the score strip across the top
+
+// The aliens, two frames each for the march: the top row, the middle two, the bottom row
+const SQUID = [
+  ['...##...', '..####..', '.######.', '##.##.##', '########', '..#..#..', '.#.##.#.', '#.#..#.#'],
+  ['...##...', '..####..', '.######.', '##.##.##', '########', '.#.##.#.', '#......#', '.#....#.'],
+]
+const CRAB = [
+  ['..#.....#..', '...#...#...', '..#######..', '.##.###.##.', '###########', '#.#######.#', '#.#.....#.#', '...##.##...'],
+  ['..#.....#..', '#..#...#..#', '#.#######.#', '###.###.###', '###########', '.#########.', '..#.....#..', '.#.......#.'],
+]
+const OCTOPUS = [
+  ['....####....', '.##########.', '############', '###..##..###', '############', '...##..##...', '..##.##.##..', '##........##'],
+  ['....####....', '.##########.', '############', '###..##..###', '############', '..###..###..', '.##..##..##.', '..##....##..'],
+]
+const ROWS = [SQUID, CRAB, CRAB, OCTOPUS]
+const ROW_COLOURS = ['#f7b6d2', '#a9d4f2', '#a9d4f2', '#bfe8d6']
+const CANNON = ['......#......', '.....###.....', '.###########.', '#############', '#############', '#############']
+const COLOURS = { space: '#0d0c16', star: '#d9ccf5', cannon: '#7dffb2', bunker: '#7dffb2', shot: '#fff', bomb: '#ffe27a', hud: '#bfe8d6' }
+
+// The same scattered stars every time
+const STARS = Array.from({ length: 50 }, (_, i) => {
+  const r = (n) => Math.abs(Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1
+  return [r(1) * WIDTH, HUD + r(2) * (HEIGHT - HUD), r(3) < 0.2 ? 2 : 1]
+})
+
+function bitmap(ctx, rows, x, y, px, colour) {
+  ctx.fillStyle = colour
+  const left = x - (rows[0].length * px) / 2
+  const top = y - (rows.length * px) / 2
+  rows.forEach((line, r) =>
+    [...line].forEach((c, i) => c === '#' && ctx.fillRect(left + i * px, top + r * px, px + 0.3, px + 0.3)),
+  )
+}
+
+function draw(ctx, game, heads, time, looking) {
+  ctx.fillStyle = COLOURS.space
+  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  for (const [x, y, size] of STARS) {
+    ctx.globalAlpha = 0.35 + 0.35 * Math.sin(time * 1.5 + x)
+    ctx.fillStyle = COLOURS.star
+    ctx.fillRect(x, y, size, size)
+  }
+  ctx.globalAlpha = 1
+
+  // Bunkers
+  ctx.fillStyle = COLOURS.bunker
+  for (const b of game.blocks) ctx.fillRect(b.x, b.y, BLOCK, BLOCK)
+
+  // The fleet
+  const f = game.fleet
+  f.alive.forEach((alive, i) => {
+    if (!alive) return
+    const row = Math.floor(i / FLEET.cols)
+    const [x, y] = alienAt(f, i % FLEET.cols, row)
+    bitmap(ctx, ROWS[row][f.frame], x, y, 2.5, ROW_COLOURS[row])
+  })
+
+  // The saucer: the other head, in a flying saucer
+  if (game.saucer) {
+    const { x, dir } = game.saucer
+    heads.saucer.draw(ctx, heads.other, { x, y: SAUCER.y - 4, size: 22, facing: dir > 0 ? 0 : 180, time, grows: false })
+    ctx.fillStyle = '#b9bcc4'
+    ctx.beginPath()
+    ctx.ellipse(x, SAUCER.y + 8, 26, 7, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.fillStyle = Math.sin(time * 12) > 0 ? '#ffe27a' : '#f7b6d2'
+    for (const dx of [-14, 0, 14]) ctx.fillRect(x + dx - 2, SAUCER.y + 7, 4, 3)
+  }
+
+  // Shots and bombs
+  ctx.fillStyle = COLOURS.shot
+  for (const b of game.bullets) ctx.fillRect(b.x - 1.5, b.y - 6, 3, 12)
+  ctx.fillStyle = COLOURS.bomb
+  for (const b of game.bombs) {
+    const wiggle = Math.floor(b.y / 4) % 2 ? 1.5 : -1.5
+    ctx.fillRect(b.x - 1.5 + wiggle, b.y - 8, 3, 4)
+    ctx.fillRect(b.x - 1.5 - wiggle, b.y - 4, 3, 4)
+    ctx.fillRect(b.x - 1.5 + wiggle, b.y, 3, 4)
+  }
+
+  // The cannon, with whoever's playing riding it (flashing while they get their breath back)
+  if (!game.over && (!game.hurt || Math.sin(time * 30) > 0)) {
+    heads.player.draw(ctx, heads.me, { x: game.x, y: PLAYER.y - 16, size: 24, facing: looking, time, grows: false })
+    bitmap(ctx, CANNON, game.x, PLAYER.y + 6, 3, COLOURS.cannon)
+  }
+
+  // Explosions, and the saucer's points where it was
+  for (const b of game.booms) {
+    const reach = 6 + b.age * 60
+    ctx.globalAlpha = 1 - b.age / 0.3
+    ctx.fillStyle = '#fff'
+    for (let a = 0; a < 8; a++) {
+      const angle = (a / 8) * Math.PI * 2
+      ctx.fillRect(b.x + Math.cos(angle) * reach - 1.5, b.y + Math.sin(angle) * reach - 1.5, 3, 3)
+    }
+    if (b.points) {
+      ctx.font = '700 16px ui-monospace, Menlo, Consolas, monospace'
+      ctx.textAlign = 'center'
+      ctx.fillStyle = '#ffe27a'
+      ctx.fillText(String(b.points), b.x, b.y)
+    }
+  }
+  ctx.globalAlpha = 1
+
+  // The score strip: score, wave, and a little cannon per life left
+  ctx.fillStyle = COLOURS.space
+  ctx.fillRect(0, 0, WIDTH, HUD)
+  ctx.fillStyle = 'rgb(255 255 255 / 0.15)'
+  ctx.fillRect(0, HUD - 2, WIDTH, 2)
+  ctx.font = '700 16px ui-monospace, Menlo, Consolas, monospace'
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = COLOURS.hud
+  ctx.textAlign = 'left'
+  ctx.fillText(`SCORE ${game.score}`, 12, HUD / 2)
+  ctx.textAlign = 'center'
+  ctx.fillText(`WAVE ${game.wave}`, WIDTH / 2 + 10, HUD / 2)
+  for (let i = 0; i < game.lives; i++) bitmap(ctx, CANNON, WIDTH - 22 - i * 26, HUD / 2, 1.6, COLOURS.cannon)
+}
+
+// What changed between one frame and the next, for the sounds (and buzzes)
+function effects(a, b) {
+  if (b.shot) feedback('shoot')
+  if (b.lives < a.lives) feedback('hit')
+  else if (b.wave > a.wave) feedback('wave')
+  else if (b.score > a.score) feedback('boom')
+  if (b.saucer && !a.saucer) feedback('saucer')
+}
+
+export default function Invaders() {
+  const canvas = useRef(null)
+  const stage = useRef(null)
+  const game = useRef(null)
+  const input = useRef({}) // what's held: { left, right, fire, target }
+  // Both heads (whoever's playing rides the cannon, the other flies the saucer), and the cheats'
+  // effects on each (lib/gameHead.js)
+  const heads = useRef({})
+  const { player } = useCheats()
+  const [phase, setPhase] = useState('ready') // ready | playing | over
+  const [score, setScore] = useState(0)
+  const [newBest, setNewBest] = useState(false)
+  const [scores, setScores] = useState(null)
+  const [best, record] = useBest(GAME)
+  const { run, begin } = useRun(GAME)
+  const phaseRef = useRef(phase)
+  phaseRef.current = phase
+  const recordRef = useRef(record)
+  recordRef.current = record
+
+  const fresh = () => start({ easy: cheatOn('easy') })
+
+  useEffect(() => {
+    const load = (who) => {
+      const sheet = new Image()
+      sheet.src = HEADS[who].sheet
+      return { sheet, sprite: HEADS[who].sprite }
+    }
+    heads.current.me = load(player)
+    heads.current.other = load(player === 'amber' ? 'caleb' : 'amber')
+  }, [player])
+
+  useEffect(() => {
+    heads.current.player = gameHead()
+    heads.current.saucer = gameHead()
+    game.current = fresh()
+    const el = canvas.current
+    const ctx = el.getContext('2d')
+    let last = performance.now()
+    let animation
+    let looking = 0 // the cannon's rider faces the way it last slid
+
+    function resize() {
+      const ratio = devicePixelRatio || 1
+      el.width = Math.round(el.clientWidth * ratio)
+      el.height = Math.round(el.clientHeight * ratio)
+    }
+    resize()
+    const observer = new ResizeObserver(resize)
+    observer.observe(el)
+
+    function tick(now) {
+      const dt = Math.min((now - last) / 1000, 1 / 30)
+      last = now
+      if (phaseRef.current === 'playing') {
+        const before = game.current
+        game.current = step(before, dt, input.current)
+        const g = game.current
+        if (Math.abs(g.x - before.x) > 0.5) looking = g.x > before.x ? 0 : 180
+        effects(before, g)
+        if (g.score !== before.score) setScore(g.score)
+        if (g.over) {
+          setPhase('over')
+          setNewBest(!g.easy && recordRef.current(g.score))
+        }
+      }
+      ctx.setTransform(el.width / WIDTH, 0, 0, el.height / HEIGHT, 0, 0)
+      draw(ctx, game.current, heads.current, now / 1000, looking)
+      animation = requestAnimationFrame(tick)
+    }
+    animation = requestAnimationFrame(tick)
+    return () => {
+      cancelAnimationFrame(animation)
+      observer.disconnect()
+    }
+  }, [])
+
+  function play() {
+    stage.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    game.current = fresh()
+    setScore(0)
+    setNewBest(false)
+    setPhase('playing')
+    begin()
+  }
+
+  // A finger (or the mouse) held down: the cannon slides under it and keeps firing
+  function aim(e) {
+    const box = stage.current.getBoundingClientRect()
+    const x = ((e.clientX - box.left) / box.width) * WIDTH
+    // Australia Mode has the page upside down, so the board's left is the screen's right
+    return document.documentElement.hasAttribute('data-cheat-australia') ? WIDTH - x : x
+  }
+  function down(e) {
+    e.preventDefault()
+    stage.current.setPointerCapture(e.pointerId)
+    if (phaseRef.current === 'ready') play()
+    input.current = { ...input.current, target: aim(e), fire: true }
+  }
+  function move(e) {
+    if (input.current.target != null) input.current = { ...input.current, target: aim(e) }
+  }
+  function up() {
+    input.current = { ...input.current, target: null, fire: false }
+  }
+
+  useEffect(() => {
+    function key(e) {
+      const pressed = e.type === 'keydown'
+      const which = LEFT_KEYS.includes(e.key) ? 'left' : RIGHT_KEYS.includes(e.key) ? 'right' : FIRE_KEYS.includes(e.key) ? 'fire' : null
+      if (!which || e.target.closest?.('input, textarea, button, a')) return
+      e.preventDefault()
+      if (pressed && phaseRef.current === 'ready') play()
+      input.current = { ...input.current, [which]: pressed }
+    }
+    addEventListener('keydown', key)
+    addEventListener('keyup', key)
+    return () => {
+      removeEventListener('keydown', key)
+      removeEventListener('keyup', key)
+    }
+  }, [])
+
+  return (
+    <article className="page game-page">
+      <p className="game-back">
+        <Link to="/games" viewTransition>
+          ← All games
+        </Link>
+        <SoundToggle />
+      </p>
+      <h1 className="page-title">Invaders</h1>
+      <p className="lede">
+        Hold a finger down to slide and fire, or use the arrow keys and Space. Shoot the saucer for bonus points.
+      </p>
+
+      <div className="game-layout">
+        <div
+          className="game-stage swipe-stage"
+          ref={stage}
+          onPointerDown={down}
+          onPointerMove={move}
+          onPointerUp={up}
+          onPointerCancel={up}
+        >
+          <canvas ref={canvas} className="game-canvas" role="img" aria-label={`Invaders. Score: ${score}`} />
+          {phase === 'ready' && (
+            <div className="game-overlay game-overlay-hint">
+              <p>Tap to start</p>
+            </div>
+          )}
+          {phase === 'over' && (
+            <div className="game-overlay" onPointerDown={(e) => e.stopPropagation()}>
+              <h2>Invaded!</h2>
+              <p className="game-final" role="status">
+                Score: <strong>{score}</strong>
+                {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
+              </p>
+              <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy} onSaved={setScores} />
+              <button type="button" className="button" onClick={play}>
+                Play again
+              </button>
+            </div>
+          )}
+        </div>
+        <ScoreBoard game={GAME} scores={scores} />
+      </div>
+    </article>
+  )
+}

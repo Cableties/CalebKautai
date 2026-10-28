@@ -104,6 +104,30 @@ export const EFFECTS = {
   hole: { notes: [{ wave: 'sine', from: 600, to: 150, ms: 300, gain: 0.6 }], buzz: 25 },
   bonus: { notes: [523, 659, 784, 1047].map((from, i) => ({ from, ms: 120, gain: 0.3, delay: i * 80 })), buzz: [20, 40, 20, 40, 20] },
   drain: { notes: [{ wave: 'sawtooth', from: 330, to: 70, ms: 500, gain: 0.45 }], buzz: 70 },
+  // Snake: a soft tick for each turn, a crunchy chomp per snack (the crash is Flappy Head's splat)
+  turn: { notes: [{ wave: 'triangle', from: 420, ms: 25, gain: 0.25 }], buzz: 4 },
+  chomp: {
+    notes: [
+      { wave: 'square', from: 660, to: 990, ms: 60, gain: 0.35 },
+      { noise: true, from: 2500, to: 900, ms: 50, gain: 0.4, delay: 30 },
+    ],
+    buzz: 10,
+  },
+  // Invaders: a pew for each shot, a crunch for each alien, the saucer's warble, a big boom when the
+  // cannon's hit, and a rising arpeggio for a new wave
+  shoot: { notes: [{ wave: 'square', from: 1400, to: 500, ms: 90, gain: 0.25 }] },
+  boom: { notes: [{ noise: true, from: 2200, to: 300, ms: 160, gain: 0.55 }], buzz: 12 },
+  saucer: {
+    notes: [0, 1, 2, 3].map((i) => ({ wave: 'sine', from: 700, to: 950, ms: 110, gain: 0.25, delay: i * 120 })),
+  },
+  hit: {
+    notes: [
+      { noise: true, from: 1500, to: 80, ms: 600, gain: 0.8 },
+      { wave: 'sawtooth', from: 160, to: 40, ms: 500, gain: 0.4 },
+    ],
+    buzz: [60, 40, 90],
+  },
+  wave: { notes: [392, 523, 659, 784].map((from, i) => ({ wave: 'triangle', from, ms: 110, gain: 0.35, delay: i * 70 })) },
 }
 
 export function feedback(name) {

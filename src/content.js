@@ -148,6 +148,24 @@ export const games = [
 		icon: "🕹️",
 		note: "I'm the ball. Four tables: Classic, Mainframe, Close Encounters and Dance Floor.",
 	},
+	{
+		to: "/games/snake",
+		label: "Snake",
+		icon: "🐍",
+		note: "Swipe to steer. Eat the hearts, grow a tail, don't bite it.",
+	},
+	{
+		to: "/games/invaders",
+		label: "Invaders",
+		icon: "👾",
+		note: "Aliens are coming. I've got a cannon. Shoot the saucer for bonus points.",
+	},
+	{
+		to: "/games/bricks",
+		label: "Bricks",
+		icon: "🧱",
+		note: "I'm the ball again. Knock out every brick, five levels and round again.",
+	},
 ];
 
 export const thingsToDo = [
@@ -179,7 +197,7 @@ export const thingsToDo = [
 	{
 		to: "/games",
 		label: "Games",
-		note: "Flappy Head, Bonk and pinball. Get your initials on the high scores.",
+		note: "Flappy Head, Bonk, pinball, Snake, Invaders and Bricks. Get your initials on the high scores.",
 	},
 	{
 		to: "/find-me",
@@ -252,6 +270,18 @@ export const pageMeta = {
 	"/games/bonk": {
 		title: "Bonk",
 		description: "Caleb's head pops up. You bonk it. 30 seconds.",
+	},
+	"/games/snake": {
+		title: "Snake",
+		description: "Steer Caleb's pixel head round the board, eating hearts and growing a tail.",
+	},
+	"/games/bricks": {
+		title: "Bricks",
+		description: "Knock out rows of pastel bricks, with Caleb's pixel head as the ball.",
+	},
+	"/games/invaders": {
+		title: "Invaders",
+		description: "Pixel aliens march down on Caleb, riding a cannon. Shoot the saucer for bonus points.",
 	},
 	"/cotg-submission": {
 		title: "CoTG",

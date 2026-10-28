@@ -4,7 +4,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { MAX_SCORE as BONK_MAX, ROUND_MS } from '../../src/lib/bonk.js'
 import { SECONDS_PER_PIPE } from '../../src/lib/flappy.js'
+import { POINTS_PER_SECOND as BRICK_POINTS_PER_SECOND } from '../../src/lib/bricks.js'
+import { POINTS_PER_SECOND as INVADER_POINTS_PER_SECOND } from '../../src/lib/invaders.js'
 import { POINTS_PER_SECOND, TABLES } from '../../src/lib/pinball.js'
+import { COLS, ROWS, SECONDS_PER_SNACK, SNAKE_GAMES } from '../../src/lib/snake.js'
 
 const HOUR = 60 * 60 * 1000
 export const GAMES = {
@@ -12,6 +15,13 @@ export const GAMES = {
   'flappy-head': { minMs: (score) => score * SECONDS_PER_PIPE * 1000 * 0.9, max: 10_000 },
   // A fixed-length round
   bonk: { minMs: (score) => (score ? ROUND_MS * 0.95 : 0), max: BONK_MAX },
+  // A board per mix of Snake's settings: a snack a move at the most, and no more snacks than
+  // there's room for on the board
+  ...Object.fromEntries(SNAKE_GAMES.map((g) => [g, { minMs: (score) => score * SECONDS_PER_SNACK * 1000 * 0.9, max: COLS * ROWS }])),
+  // None faster than a top-row alien with every shot
+  invaders: { minMs: (score) => (score / INVADER_POINTS_PER_SECOND) * 1000, max: 1_000_000 },
+  // None faster than a top-row tough brick with every bounce
+  bricks: { minMs: (score) => (score / BRICK_POINTS_PER_SECOND) * 1000, max: 1_000_000 },
   // A board per pinball table, none faster than a ball pinging between bumpers non-stop
   ...Object.fromEntries(
     TABLES.map((t) => [`pinball-${t.id}`, { minMs: (score) => (score / POINTS_PER_SECOND) * 1000, max: 10_000_000 }]),

@@ -20,6 +20,9 @@ export const CHEATS = [
   { id: 'comic', name: 'Comic Sans Mode', description: 'The most professional font.', code: 'COMIC' },
   { id: 'trail', name: 'Head Trail', description: 'Tiny heads follow your cursor or finger.', code: 'TRAIL' },
   { id: 'night', name: 'Night Vision', description: 'Goggles on.', code: 'NIGHT' },
+  // Secret: not on the cheat codes page. On a phone, tap the Games heading four times (pages/Games.jsx).
+  // Easy runs stay off the high-score boards (components/Scores.jsx).
+  { id: 'easy', name: 'Easy Mode', description: 'All the games go a little easier on you.', code: 'EZPZ', hidden: true },
 ]
 
 // The secret: replays the tattoo hack wherever you are

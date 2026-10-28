@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { GAMES, board, cleanInitials, parseScore, runStart, startRun } from '../../api/_lib/scores.js'
 import { HOLES, MAX_SCORE, ROUND_MS, UP_MS, nextHole, upTime } from '../../src/lib/bonk.js'
 import * as flappy from '../../src/lib/flappy.js'
+import * as pinball from '../../src/lib/pinball.js'
 
 const { FLAP, GROUND, HEAD_X, HEIGHT, PIPE_WIDTH, RADIUS, SECONDS_PER_PIPE, SPACING, WIDTH } = flappy
 const half = () => 0.5
@@ -59,6 +60,19 @@ test('flappy: hitting a pipe ends it', () => {
 test('flappy: gaps narrow as the score goes up, but not forever', () => {
   assert.ok(flappy.gapFor(10) < flappy.gapFor(0))
   assert.equal(flappy.gapFor(1000), flappy.gapFor(2000))
+})
+
+test('Easy Mode: wider gaps and a gentler fall, longer heads, and an extra pinball', () => {
+  assert.ok(flappy.gapFor(0, true) > flappy.gapFor(0))
+  assert.ok(flappy.gapFor(1000, true) > flappy.gapFor(1000))
+  const easy = flappy.start({ easy: true }, half)
+  assert.ok(easy.pipes[0].gap > flappy.start({}, half).pipes[0].gap)
+  // After half a second without flapping, the easy head hasn't fallen as far
+  assert.ok(play(easy, 0.5).y < play(flappy.start({}, half), 0.5).y)
+  assert.ok(upTime(0, true) > upTime(0))
+  assert.ok(upTime(ROUND_MS, true) > upTime(ROUND_MS))
+  assert.equal(pinball.start(undefined, { easy: true }).balls, pinball.BALLS + 1)
+  assert.equal(pinball.start().balls, pinball.BALLS)
 })
 
 test('flappy: the face tilts up after a flap and down in a dive', () => {

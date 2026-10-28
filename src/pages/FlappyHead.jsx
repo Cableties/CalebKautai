@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HEADS } from '../lib/bounce.js'
-import { gameHead } from '../lib/gameHead.js'
+import { cheatOn, gameHead } from '../lib/gameHead.js'
 import { GROUND, HEAD_X, HEIGHT, PIPE_WIDTH, RADIUS, SPEED, WIDTH, facing, flap, start, step } from '../lib/flappy.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
 import SoundToggle from '../components/SoundToggle.jsx'
@@ -144,7 +144,7 @@ export default function FlappyHead() {
   const distance = useRef(0)
   const frameTime = useRef(0) // the animation's clock, in seconds, so puffs age in step with it
 
-  const fresh = () => start({ radius: RADIUS * (document.documentElement.hasAttribute('data-cheat-bighead') ? 1.6 : 1) })
+  const fresh = () => start({ radius: RADIUS * (cheatOn('bighead') ? 1.6 : 1), easy: cheatOn('easy') })
 
   useEffect(() => {
     const sheet = new Image()
@@ -184,7 +184,7 @@ export default function FlappyHead() {
         if (game.current.dead) {
           feedback('splat')
           setPhase('over')
-          setNewBest(record(game.current.score))
+          setNewBest(!game.current.easy && record(game.current.score))
         }
       } else if (phaseRef.current === 'ready') {
         // Bob gently while waiting to start
@@ -264,7 +264,7 @@ export default function FlappyHead() {
                 Score: <strong>{score}</strong>
                 {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
               </p>
-              <ScoreEntry game={GAME} score={score} run={run} onSaved={setScores} />
+              <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy} onSaved={setScores} />
               <button type="button" className="button" onClick={play}>
                 Play again
               </button>

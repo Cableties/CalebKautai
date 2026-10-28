@@ -11,10 +11,13 @@ import Aliens from './pages/Aliens.jsx'
 import CheatCodes from './pages/CheatCodes.jsx'
 import DecisionWheel from './pages/DecisionWheel.jsx'
 import Bonk from './pages/Bonk.jsx'
+import Bricks from './pages/Bricks.jsx'
 import FlappyHead from './pages/FlappyHead.jsx'
 import Games from './pages/Games.jsx'
 import GuestbookAdmin from './pages/GuestbookAdmin.jsx'
+import Invaders from './pages/Invaders.jsx'
 import Pinball from './pages/Pinball.jsx'
+import Snake from './pages/Snake.jsx'
 import Placeholder from './pages/Placeholder.jsx'
 import NotFound from './pages/NotFound.jsx'
 
@@ -39,6 +42,9 @@ export default function App() {
         <Route path="games/flappy-head" element={<FlappyHead />} />
         <Route path="games/bonk" element={<Bonk />} />
         <Route path="games/pinball" element={<Pinball />} />
+        <Route path="games/snake" element={<Snake />} />
+        <Route path="games/invaders" element={<Invaders />} />
+        <Route path="games/bricks" element={<Bricks />} />
         <Route path="cotg-submission" element={<Placeholder title="CoTG" blurb="Submissions aren't open yet. When they are, this is where they'll go." />} />
         <Route path="*" element={<NotFound />} />
       </Route>

@@ -22,6 +22,108 @@ test("the games page lists the games, and the menu leads there", async ({
 	await expect(
 		page.getByRole("heading", { name: "Bonk", level: 1 }),
 	).toBeVisible();
+	for (const name of ["Snake", "Invaders", "Bricks"]) {
+		await page.getByRole("link", { name: "← All games" }).click();
+		await page.getByRole("link", { name: new RegExp(name) }).click();
+		await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+	}
+});
+
+test.describe("Snake", () => {
+	test("an arrow key starts it, and left alone it runs into the wall", async ({
+		page,
+	}) => {
+		await page.goto("/games/snake");
+		await expect(page.getByText("Swipe to start")).toBeVisible();
+		await page.keyboard.press("ArrowUp");
+		await expect(page.getByText("Swipe to start")).toBeHidden();
+		await expect(page.getByRole("heading", { name: "Ouch!" })).toBeVisible({
+			timeout: 5000,
+		});
+		await expect(page.getByLabel("Your initials")).toHaveCount(0);
+	});
+
+	test("settings are remembered, and each mix has its own high scores", async ({
+		page,
+		api,
+	}) => {
+		api.scores["snake-portals"] = [{ initials: "POR", score: 9 }];
+		await page.goto("/games/snake");
+		const board = page.getByRole("region", { name: "High scores" });
+		await expect(board).toContainText("No scores yet");
+		const portals = page.getByRole("switch", { name: "Portals" });
+		await portals.click();
+		await expect(portals).toHaveAttribute("aria-checked", "true");
+		await expect(board).toContainText("POR");
+		await page.reload();
+		await expect(page.getByRole("switch", { name: "Portals" })).toHaveAttribute(
+			"aria-checked",
+			"true",
+		);
+		await expect(board).toContainText("POR");
+		// Not while a game's going
+		await page.keyboard.press("ArrowUp");
+		await expect(page.getByRole("switch", { name: "Obstacles" })).toBeDisabled();
+	});
+
+	test("a swipe on the board starts it", async ({ page }) => {
+		await page.goto("/games/snake");
+		const stage = page.locator(".game-stage");
+		await stage.scrollIntoViewIfNeeded();
+		const box = await stage.boundingBox();
+		const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
+		await page.mouse.move(x, y);
+		await page.mouse.down();
+		await page.mouse.move(x, y - 60, { steps: 4 });
+		await page.mouse.up();
+		await expect(page.getByText("Swipe to start")).toBeHidden();
+		await expect(page.getByRole("heading", { name: "Ouch!" })).toBeVisible({
+			timeout: 5000,
+		});
+	});
+});
+
+test.describe("Bricks", () => {
+	test("Space starts it and launches the ball, which knocks out bricks", async ({
+		page,
+	}) => {
+		await page.goto("/games/bricks");
+		await expect(page.getByText("Tap to start")).toBeVisible();
+		await page.keyboard.press(" ");
+		await expect(page.getByText("Tap to start")).toBeHidden();
+		await expect(page.getByRole("img", { name: /Bricks. Score: [1-9]/ })).toBeVisible({
+			timeout: 5000,
+		});
+	});
+});
+
+test.describe("Invaders", () => {
+	test("holding a finger down slides the cannon under it and fires, and hits score", async ({
+		page,
+	}) => {
+		await page.goto("/games/invaders");
+		const stage = page.locator(".game-stage");
+		await stage.scrollIntoViewIfNeeded();
+		const box = await stage.boundingBox();
+		// Under the third column of aliens, which starts at x = 157 of 360
+		await page.mouse.move(box.x + box.width * (157 / 360), box.y + box.height * 0.85);
+		await page.mouse.down();
+		await expect(page.getByText("Tap to start")).toBeHidden();
+		await expect(page.getByRole("img", { name: /Invaders. Score: [1-9]/ })).toBeVisible({
+			timeout: 5000,
+		});
+		await page.mouse.up();
+	});
+
+	test("Space starts it and fires", async ({ page }) => {
+		await page.goto("/games/invaders");
+		await page.keyboard.down(" ");
+		await expect(page.getByText("Tap to start")).toBeHidden();
+		await expect(page.getByRole("img", { name: /Invaders. Score: [1-9]/ })).toBeVisible({
+			timeout: 5000,
+		});
+		await page.keyboard.up(" ");
+	});
 });
 
 test.describe("Flappy Head", () => {
@@ -149,6 +251,29 @@ test.describe("Pinball", () => {
 });
 
 test.describe("Bonk", () => {
+	test("with Easy Mode on, a score stays off the board and the personal best", async ({
+		page,
+		api,
+	}) => {
+		await page.addInitScript(() =>
+			sessionStorage.setItem("cheats", JSON.stringify(["easy"])),
+		);
+		await page.clock.install();
+		await page.goto("/games/bonk");
+		await expect(page.getByText("Easy mode", { exact: true })).toBeVisible();
+		await page.getByRole("button", { name: "Start" }).click();
+		await page.clock.runFor(450);
+		await page.getByRole("button", { name: "Bonk the head!" }).click();
+		await page.clock.runFor(ROUND_MS);
+		await expect(page.getByRole("heading", { name: "Time!" })).toBeVisible();
+		await expect(page.getByText("Score: 1", { exact: true })).toBeVisible();
+		await expect(
+			page.getByText("Easy mode was on, so this one's just for you."),
+		).toBeVisible();
+		await expect(page.getByLabel("Your initials")).toHaveCount(0);
+		expect(api.scorePosts).toEqual([]);
+	});
+
 	test("bonking heads scores, and the score goes on the board", async ({
 		page,
 		api,
@@ -251,6 +376,9 @@ test.describe("tap feedback", () => {
 		["/games/flappy-head", ".game-stage"],
 		["/games/pinball", ".pinball-stage"],
 		["/games/bonk", ".bonk-hole"],
+		["/games/snake", ".game-stage"],
+		["/games/invaders", ".game-stage"],
+		["/games/bricks", ".game-stage"],
 	]) {
 		test(`${path}: no blue flash on a tap`, async ({ page, browserName }) => {
 			// Only Chromium's test build reports the tap highlight
