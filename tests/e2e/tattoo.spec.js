@@ -1,4 +1,4 @@
-import { expect, openTattoo, tapStar, test } from './fixtures.js'
+import { expect, openNav, openTattoo, tapStar, test } from './fixtures.js'
 
 const hackDialog = (page) => page.getByRole('dialog', { name: /hacking in progress/i })
 
@@ -45,19 +45,43 @@ test('the hack can be skipped while it plays', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Work thing/ })).toBeVisible()
 })
 
-test('the hack plays on every visit, but a visit only counts once', async ({ page, api }) => {
+test("only a scan plays the hack and counts: not a reload, going back, or the site's own link", async ({ page, api }) => {
+  // A scan: the QR code opens /tattoo in a fresh tab
   await page.goto('/tattoo')
   await page.getByRole('button', { name: 'Skip hack' }).click()
+  await expect(page.getByText('42 people have scanned this tattoo')).toBeVisible()
+
   await page.reload()
-  await expect(hackDialog(page)).toBeVisible()
-  await page.getByRole('button', { name: 'Skip hack' }).click()
+  await expect(page.getByText('42 people have scanned this tattoo')).toBeVisible()
+  await expect(hackDialog(page)).toHaveCount(0)
+
   await page.getByRole('link', { name: /Work thing/ }).click()
   // Wait for the page itself, not just the URL: the fade transition renders it a moment later
   await expect(page.getByRole('heading', { name: 'Selected work' })).toBeVisible()
   await page.goBack()
   await expect(page).toHaveURL('/tattoo')
-  await expect(hackDialog(page)).toBeVisible()
+  await expect(page.getByText('42 people have scanned this tattoo')).toBeVisible()
+  await expect(hackDialog(page)).toHaveCount(0)
   expect(api.scanPosts).toBe(1)
+})
+
+test("the site's Tattoo link shows the page without the hack or a scan", async ({ page, api }) => {
+  await openTattoo(page) // the scan
+  await page.goto('/')
+  await openNav(page)
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Tattoo' }).click()
+  await expect(page.getByText('42 people have scanned this tattoo')).toBeVisible()
+  await expect(hackDialog(page)).toHaveCount(0)
+  expect(api.scanPosts).toBe(1)
+})
+
+test('a fresh tab opened from the site (either domain) is not a scan', async ({ page, api }) => {
+  for (const referer of ['https://caleb-kautai.vercel.app/', 'https://www.calebkautai.com/about']) {
+    await page.goto('/tattoo', { referer })
+    await expect(page.getByText('41 people have scanned this tattoo')).toBeVisible()
+    await expect(hackDialog(page)).toHaveCount(0)
+  }
+  expect(api.scanPosts).toBe(0)
 })
 
 test('with reduced motion the hack is a still screen, ready to continue', async ({ page }) => {
@@ -122,6 +146,39 @@ test.describe('guestbook', () => {
     // On the 200 × 200 grid: from near the top left to near the bottom right
     expect(points.slice(0, 2).every((n) => n >= 15 && n <= 25)).toBe(true)
     expect(points.slice(-2).every((n) => n >= 175 && n <= 185)).toBe(true)
+  })
+
+  test('the bucket fills an area and the eraser rubs out, and both are sent with the doodle', async ({ page, api }) => {
+    await openTattoo(page)
+    // A box, then fill inside it in blue
+    await draw(page, [0.2, 0.2], [0.8, 0.2])
+    await draw(page, [0.8, 0.2], [0.8, 0.8])
+    await draw(page, [0.8, 0.8], [0.2, 0.8])
+    await draw(page, [0.2, 0.8], [0.2, 0.2])
+    await form(page).getByRole('radio', { name: 'Fill' }).click()
+    await form(page).getByRole('radio', { name: 'Blue' }).click()
+    const pad = form(page).getByLabel('Doodle pad')
+    await pad.click({ position: { x: (await pad.boundingBox()).width / 2, y: (await pad.boundingBox()).height / 2 } })
+    // Blue inside the box, and bare paper outside it
+    const pixel = (fx, fy) =>
+      pad.evaluate((c, [fx, fy]) => [...c.getContext('2d').getImageData(c.width * fx, c.height * fy, 1, 1).data], [fx, fy])
+    await expect.poll(async () => {
+      const [r, , b, a] = await pixel(0.5, 0.5)
+      return b > r + 60 && a > 100
+    }).toBe(true)
+    expect((await pixel(0.05, 0.05))[3]).toBe(0)
+    // The eraser takes it back to paper
+    await form(page).getByRole('radio', { name: 'Eraser' }).click()
+    await draw(page, [0.4, 0.5], [0.6, 0.5])
+    expect((await pixel(0.5, 0.5))[3]).toBe(0)
+
+    await sign(page).click()
+    await expect(page.getByText("Thanks! It'll show up once I've had a look.")).toBeVisible()
+    const tools = api.reviewPosts[0].doodle.map((m) => m.tool ?? 'pencil')
+    expect(tools).toEqual(['pencil', 'pencil', 'pencil', 'pencil', 'fill', 'erase'])
+    const fill = api.reviewPosts[0].doodle[4]
+    expect(fill.ink).toBe(2)
+    expect(fill.points.every((n) => Math.abs(n - 100) <= 2)).toBe(true)
   })
 
   test('undo and clear take strokes off the pad', async ({ page }) => {

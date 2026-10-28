@@ -117,7 +117,7 @@ export async function openNavGroup(page, name) {
   await expect(group).toHaveAttribute('aria-expanded', 'true')
 }
 
-// Open the tattoo page and skip the hack cutscene (it plays on every visit)
+// Open the tattoo page as a scan (a fresh tab) and skip the hack cutscene
 export async function openTattoo(page) {
   await page.goto('/tattoo')
   await page.getByRole('button', { name: 'Skip hack' }).click()

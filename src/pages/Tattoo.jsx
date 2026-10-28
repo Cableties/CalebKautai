@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Hack from '../components/Hack.jsx'
 import Reviews from '../components/Reviews.jsx'
@@ -10,17 +10,21 @@ const choices = [
   { to: '/tattoo-love-interest', label: 'Love interest' },
 ]
 
-// Each browser session counts as one scan (the API also limits repeats per visitor),
-// though the hack itself plays on every visit to the page.
+// Only a real scan of the QR code plays the hack and counts: index.html marks the tab with
+// data-scan when it opened straight onto /tattoo (not a reload, back/forward or a link from this
+// site). The first time the page shows uses the scan up, so coming back to it doesn't replay it.
+let scanUnused = typeof document !== 'undefined' && document.documentElement.hasAttribute('data-scan')
+
+// Each browser session counts as one scan at most (the API also limits repeats per visitor)
 const COUNTED_KEY = 'tattoo-scan-counted'
 
-function useScanCount() {
+function useScanCount(scan) {
   const [count, setCount] = useState(null)
   useEffect(() => {
-    let counted = false
+    let counted = !scan.current
     try {
-      counted = sessionStorage.getItem(COUNTED_KEY) === '1'
-      sessionStorage.setItem(COUNTED_KEY, '1')
+      counted ||= sessionStorage.getItem(COUNTED_KEY) === '1'
+      if (scan.current) sessionStorage.setItem(COUNTED_KEY, '1')
     } catch {
       // Storage blocked: the API's own limit stops double counting
     }
@@ -46,13 +50,24 @@ function Hologram({ src, width, height, alt }) {
 }
 
 export default function Tattoo() {
-  // The hack (components/Hack.jsx) plays on every visit, over the page, until the visitor continues
+  // The hack (components/Hack.jsx) plays over the page after a scan, until the visitor continues.
+  // It's in the prerendered HTML (hidden there before paint unless it's a scan), so it starts on
+  // and comes off before paint for everyone else.
   const [intro, setIntro] = useState(true)
-  const scans = useScanCount()
+  // Read once (a ref, so React's development double-run of effects doesn't read it used up)
+  const scan = useRef(null)
+  useLayoutEffect(() => {
+    if (scan.current === null) {
+      scan.current = scanUnused
+      scanUnused = false
+    }
+    if (!scan.current) setIntro(false)
+  }, [])
+  const scans = useScanCount(scan)
 
   return (
     <>
-      {intro && <Hack victim={scans} onFinish={() => setIntro(false)} />}
+      {intro && <Hack className="tattoo-hack" victim={scans} onFinish={() => setIntro(false)} />}
 
       <article className={'page tattoo' + (intro ? '' : ' tattoo-in')}>
         <h1 className="page-title glitch" data-text="Woah, you actually scanned it!">

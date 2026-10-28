@@ -1,7 +1,8 @@
 import { frame } from './bounce.js'
 
 // The games' head (Flappy Head's bird, Pinball's ball) dressed up by the cheats that change the
-// bouncing head: Dance Mode tints it the turning disco hue, Matrix Mode turns it green, Big Head Mode
+// bouncing head: Dance Mode tints it pink (and styles.css turns the whole canvas round the colour
+// wheel, head and all, in time with the page), Matrix Mode turns it green, Big Head Mode
 // makes it a wobbling bobblehead and Head Trail leaves little heads behind it. (Cheats that change
 // the whole page, like Night Vision or Australia Mode, reach the games by themselves. Bonk's head is
 // a page element, so styles.css does it there.)
@@ -9,14 +10,8 @@ export const cheatOn = (id) => document.documentElement.hasAttribute(`data-cheat
 
 const TRAIL_EVERY = 0.045 // seconds between little heads, like the site's Head Trail
 const TRAIL_SECONDS = 0.7
+const DANCE = 'hsl(330 90% 60%)'
 const MATRIX = 'hsl(140 100% 50%)'
-
-// The disco hue the rest of the page is on (styles.css animates --disco), or near enough from the
-// clock if the browser can't say
-function discoHue(time) {
-  const css = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--disco'))
-  return Number.isFinite(css) ? css : ((time / 6) % 1) * 360
-}
 
 // One sprite frame, tinted: 'color' blending keeps each pixel's lightness and takes the colour's
 // hue, then the frame's own shape cuts it back out (works on every browser, unlike canvas filters)
@@ -68,7 +63,7 @@ export function gameHead() {
     big: () => (cheatOn('bighead') ? 1.6 : 1),
     draw(ctx, head, { x, y, size, facing, time, alpha = 1, scroll = 0, grows = true }) {
       if (!head?.sheet.complete || !head.sheet.naturalWidth) return
-      const colour = cheatOn('dance') ? `hsl(${discoHue(time)} 90% 55%)` : cheatOn('matrix') ? MATRIX : null
+      const colour = cheatOn('dance') ? DANCE : cheatOn('matrix') ? MATRIX : null
       const big = cheatOn('bighead')
       const wobble = big ? Math.sin((time * Math.PI * 2) / 1.3) * 0.12 : 0
       if (big && grows) size *= 1.6

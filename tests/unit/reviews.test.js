@@ -72,6 +72,20 @@ test('doodles only take whole-number points on the grid, in one of the inks', ()
   assert.ok(parseReview({ rating: 5, doodle: [{ ink: 9, points: [1, 1] }] }).error)
 })
 
+test('doodles can have fills and eraser marks', () => {
+  const marks = [line, { tool: 'fill', ink: 2, points: [100, 100] }, { tool: 'erase', points: [10, 10, 40, 40] }]
+  assert.deepEqual(parseDoodle(marks), marks)
+  // The eraser has no colour to keep
+  assert.deepEqual(parseDoodle([{ tool: 'erase', ink: 3, points: [1, 1] }]), [{ tool: 'erase', points: [1, 1] }])
+  for (const bad of [
+    { tool: 'fill', ink: 0, points: [1, 1, 2, 2] }, // a fill is one point
+    { tool: 'fill', points: [1, 1] }, // in a colour
+    { tool: 'spray', ink: 0, points: [1, 1] },
+  ]) {
+    assert.equal(parseDoodle([bad]), null, JSON.stringify(bad))
+  }
+})
+
 test('doodles drop anything extra on a stroke', () => {
   assert.deepEqual(parseDoodle([{ ...line, colour: 'red', onclick: 'x' }]), [line])
 })

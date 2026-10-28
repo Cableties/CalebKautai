@@ -26,7 +26,7 @@ function readDevice() {
   return { device, screen: `${screen.width}×${screen.height}`, time }
 }
 
-export default function Hack({ victim = null, granted = 'ACCESS GRANTED', onFinish = () => {} }) {
+export default function Hack({ victim = null, granted = 'ACCESS GRANTED', className = '', onFinish = () => {} }) {
   const [stage, setStage] = useState('playing')
   const [info, setInfo] = useState(null)
   const [battery, setBattery] = useState(null)
@@ -59,7 +59,7 @@ export default function Hack({ victim = null, granted = 'ACCESS GRANTED', onFini
 
   return (
     <div
-      className={'hack' + (stage === 'leaving' ? ' leaving' : '')}
+      className={'hack' + (className && ` ${className}`) + (stage === 'leaving' ? ' leaving' : '')}
       role="dialog"
       aria-modal="true"
       aria-label="Totally real hacking in progress"

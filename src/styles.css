@@ -2054,6 +2054,67 @@ a {
   filter: sepia(1) saturate(3) hue-rotate(calc((var(--disco) - 40) * 1deg));
 }
 
+/* Everything with colours of its own dances too, each spaced round the same turning hue. These
+   keep their own lightness, since most sit on fixed backgrounds (the dark cheat cards, the hack). */
+:root[data-cheat-dance] {
+  --disco-glow: oklch(0.86 0.14 calc(var(--disco) + 180));
+  --disco-key: oklch(0.82 0.12 var(--disco));
+  --disco-gold: oklch(0.78 0.16 calc(var(--disco) + 90));
+  /* The decision wheel's slices: eight pastels an eighth of the way round from each other */
+  --wheel-0: oklch(0.86 0.11 var(--disco));
+  --wheel-1: oklch(0.86 0.11 calc(var(--disco) + 45));
+  --wheel-2: oklch(0.86 0.11 calc(var(--disco) + 90));
+  --wheel-3: oklch(0.86 0.11 calc(var(--disco) + 135));
+  --wheel-4: oklch(0.86 0.11 calc(var(--disco) + 180));
+  --wheel-5: oklch(0.86 0.11 calc(var(--disco) + 225));
+  --wheel-6: oklch(0.86 0.11 calc(var(--disco) + 270));
+  --wheel-7: oklch(0.86 0.11 calc(var(--disco) + 315));
+}
+/* The cheat codes page: switched-on cards, switches, codes, the Run button and the toast */
+:root[data-cheat-dance] .cheat-list li.on {
+  border-color: var(--disco-glow);
+  box-shadow: 0 0 0 1px var(--disco-glow), 0 0 22px -6px var(--disco-glow);
+}
+:root[data-cheat-dance] :is(.cheat-switch[aria-checked='true'], .cheat-toast span, .cheat-run:hover) {
+  background: var(--disco-glow);
+}
+:root[data-cheat-dance] :is(.cheat-code kbd, .cheat-run) {
+  background: var(--disco-key);
+}
+:root[data-cheat-dance] .cheat-switch:focus-visible {
+  outline-color: var(--disco-key);
+}
+/* Review stars, and Bonk's dizzy stars */
+:root[data-cheat-dance] :is(.stars, .star-input label.on, .bonk-stars) {
+  color: var(--disco-gold);
+}
+/* The hack screen, and the tattoo hologram */
+:root[data-cheat-dance] .hack {
+  --hack-text: oklch(0.9 0.08 calc(var(--disco) + 144));
+  --hack-pink: oklch(0.82 0.12 var(--disco));
+  --hack-blue: oklch(0.85 0.1 calc(var(--disco) + 72));
+}
+:root[data-cheat-dance] .holo {
+  --holo: oklch(0.65 0.15 var(--disco));
+  --holo-glow: oklch(0.65 0.15 var(--disco) / 0.55);
+}
+/* The head's hologram blue is about 200° round the wheel: turned to the disco hue, like the beam */
+:root[data-cheat-dance] .holo-stack {
+  filter: hue-rotate(calc((var(--disco) - 200) * 1deg));
+}
+/* Bonk's board and turf (kept light, as the score sits on it in dark text) */
+:root[data-cheat-dance] .bonk {
+  background: oklch(0.88 0.08 calc(var(--disco) + 144));
+}
+:root[data-cheat-dance] .bonk-hole {
+  background: radial-gradient(ellipse 70% 30% at 50% 82%, #2e2a45 0 60%, transparent 62%), oklch(0.83 0.09 calc(var(--disco) + 144));
+}
+/* Flappy Head's sky and pipes, and the pinball tables: the whole picture turns round the colour
+   wheel (the head is tinted to suit in lib/gameHead.js) */
+:root[data-cheat-dance] .game-canvas {
+  filter: hue-rotate(calc(var(--disco) * 1deg));
+}
+
 /* Australia Mode: the whole site upside down. The page scrolls inside #root (fixed to the screen),
    so the player, pop-ups and bouncing head flip with it instead of escaping to the right way up. */
 :root[data-cheat-australia],
@@ -3265,52 +3326,66 @@ a {
   font-weight: 600;
   font-size: 0.95rem;
 }
+/* The doodle pad: a taped-down sheet of sketch paper, with tools and a tin of coloured pencils
+   underneath. Paper stays paper in dark mode. The grain is SVG noise, under the drawing. */
 .doodle-pad {
+  --paper-sheet: #fbf7ec;
+  --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .36 0 0 0 0 .26 0 0 0 .35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   display: grid;
-  gap: 10px;
-  width: min(320px, 100%);
+  gap: 14px;
+  width: min(340px, 100%);
+  /* A drag from the paper draws, and mustn't select the page's text (and scroll along with it) */
+  user-select: none;
+  -webkit-user-select: none;
+}
+.doodle-paper {
+  position: relative;
+  margin-top: 10px;
+  rotate: -0.6deg;
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.15),
+    0 12px 20px -12px rgb(0 0 0 / 0.4);
+}
+/* A strip of tape holding it down */
+.doodle-paper::before {
+  content: '';
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  width: 92px;
+  height: 22px;
+  translate: -50% 0;
+  rotate: 2deg;
+  background: rgb(244 228 172 / 0.78);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+  pointer-events: none;
 }
 .doodle-canvas,
 .doodle {
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  background:
-    linear-gradient(rgb(125 255 178 / 0.06) 1px, transparent 1px) 0 0 / 10% 10%,
-    linear-gradient(90deg, rgb(125 255 178 / 0.06) 1px, transparent 1px) 0 0 / 10% 10%,
-    #15131f;
-  border-radius: 12px;
+  background: var(--paper-grain), var(--paper-sheet, #fbf7ec);
 }
 .doodle-canvas {
   cursor: crosshair;
   touch-action: none; /* drawing, not scrolling */
 }
-.doodle-tools {
+.doodle-canvas[data-tool='fill'] {
+  cursor: cell;
+}
+.doodle-tools,
+.doodle-actions {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: 8px;
 }
-.doodle-inks {
-  display: flex;
+.doodle-tool,
+.doodle-actions > button {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
-  margin-right: auto;
-}
-.doodle-ink {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  background: var(--ink-colour);
-  border: 3px solid var(--paper);
-  border-radius: 50%;
-  box-shadow: 0 0 0 1px var(--line);
-  cursor: pointer;
-}
-.doodle-ink[aria-checked='true'] {
-  box-shadow: 0 0 0 2px var(--ink);
-}
-.doodle-tools > button {
-  min-height: 32px;
+  min-height: 34px;
   padding: 0 12px;
   font: 600 0.85rem/1 var(--body);
   color: var(--ink);
@@ -3319,21 +3394,86 @@ a {
   border-radius: 999px;
   cursor: pointer;
 }
-.doodle-tools > button:disabled {
+.doodle-tool svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.doodle-tool[aria-checked='true'] {
+  color: var(--paper);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.doodle-actions > button:disabled {
   opacity: 0.45;
   cursor: default;
 }
-/* In the list, a doodle is a small picture above the comment */
+.doodle-actions {
+  justify-content: flex-end;
+}
+/* The pencil tin: pencils standing in a row, the chosen one pulled up out of it */
+.doodle-pencils {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  height: 58px;
+  padding: 0 14px;
+  overflow: hidden;
+}
+.doodle-pencils::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 14px;
+  background: linear-gradient(to bottom, #b9bcc4, #8d919b);
+  border-radius: 6px 6px 0 0;
+  box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.45);
+  pointer-events: none;
+}
+.doodle-pencil {
+  flex: none;
+  width: 22px;
+  height: 70px;
+  padding: 0;
+  margin-top: 16px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  transition: translate 0.15s ease-out;
+}
+.doodle-pencil svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.25));
+}
+.doodle-pencil:hover {
+  translate: 0 -4px;
+}
+.doodle-pencil[aria-checked='true'] {
+  translate: 0 -14px;
+}
+.doodle-pencil:focus-visible {
+  outline: 3px solid var(--blue-ink);
+  outline-offset: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .doodle-pencil {
+    transition: none;
+  }
+}
+/* In the list, a doodle is a small sheet above the comment */
 .review-list .doodle {
   width: min(160px, 50%);
   margin: 8px 0;
-}
-.doodle path {
-  fill: none;
-  stroke-width: 5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  filter: drop-shadow(0 0 3px currentColor);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
 }
 
 /* ---------- Guestbook approvals (pages/GuestbookAdmin.jsx), made for a phone ---------- */

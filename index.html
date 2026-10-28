@@ -16,6 +16,8 @@
     <meta name="twitter:image" content="https://www.calebkautai.com/og.png" />
     <!-- The tattoo page's hack and the love interest popup are closed by a tap, which needs JavaScript -->
     <noscript><style>.hack, .taken { display: none; }</style></noscript>
+    <!-- The tattoo page's hack is prerendered, so it's hidden before paint unless this visit is a scan -->
+    <style>:root:not([data-scan]) .tattoo-hack { display: none; }</style>
     <script>
       // Apply a saved light/dark choice before first paint, so there's no flash of the other theme.
       try {
@@ -24,6 +26,14 @@
         // Cheat codes switched on earlier this session (components/Cheats.jsx)
         for (const id of JSON.parse(sessionStorage.getItem('cheats') || '[]')) {
           document.documentElement.setAttribute('data-cheat-' + id, '')
+        }
+        // Arrived by scanning the tattoo's QR code (it points at /tattoo): a fresh load of that
+        // page, not a reload or back/forward, and not from a link on this site (either domain).
+        // Only then does the tattoo page play its hack and count a scan (pages/Tattoo.jsx).
+        const nav = performance.getEntriesByType('navigation')[0]
+        const fromSite = /caleb-?kautai/i.test(document.referrer)
+        if (location.pathname.replace(/(.)\/$/, '$1') === '/tattoo' && (!nav || nav.type === 'navigate') && !fromSite) {
+          document.documentElement.setAttribute('data-scan', '')
         }
       } catch {}
     </script>
