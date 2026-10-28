@@ -20,7 +20,9 @@ export const HUD = 44
 export const LINE_Y = 548 // a bubble past here and it's over
 export const LAUNCHER = { y: 600 }
 const SHOT_SPEED = 960
-const SUBSTEPS = 8
+// A shot moves in steps this long, always from the launcher, so the aim's preview of where it'll
+// land (aimed()) takes exactly the same path and lands in exactly the same place
+const STEP = 4
 const AIM = { max: 1.35, turn: 1.8 } // radians either side of straight up; radians per second with keys
 export const COLOURS = ['#f05d8a', '#4aa3e8', '#5cc97a', '#f5b937', '#9b6ce0', '#ff8a4c'] // pink, blue, green, yellow, purple, orange
 export const RAINBOW = -1 // a rainbow shot's colour
@@ -32,7 +34,7 @@ const POWER_CHANCE = 0.06 // of each bubble in a new level
 export const SETTINGS = [
   { id: 'nopowers', name: 'No power-ups', note: 'Just bubbles.' },
   { id: 'six', name: 'Six colours', note: 'Every colour from the start. Much harder.' },
-  { id: 'guide', name: 'Aiming guide', note: 'Shows the whole path, bounces and all.' },
+  { id: 'noguide', name: 'No aiming guide', note: 'Just a few dots to aim by: no path, no ghost bubble.' },
 ]
 export const bubblesGame = (settings = {}) => settingsGame('bubbles', SETTINGS, settings)
 export const BUBBLES_GAMES = allSettingsGames('bubbles', SETTINGS)
@@ -90,13 +92,13 @@ function level(s, random) {
 }
 
 // `width`: the screen's width (wider on a desktop)
-export function start({ easy = false, nopowers = false, six = false, guide = false, width = WIDTH } = {}, random = Math.random) {
+export function start({ easy = false, nopowers = false, six = false, noguide = false, width = WIDTH } = {}, random = Math.random) {
   const s = {
     width,
     cols: colsFor(width),
     easy,
     six,
-    guide: guide || easy,
+    guide: !noguide || easy, // the whole path and a ghost where it'll land (Easy Mode always has it)
     powers: !nopowers,
     level: 1,
     score: 0,
@@ -126,8 +128,9 @@ export function fire(state) {
     shot: {
       x: launcherX(state),
       y: LAUNCHER.y,
-      vx: Math.sin(state.aim) * SHOT_SPEED,
-      vy: -Math.cos(state.aim) * SHOT_SPEED,
+      dx: Math.sin(state.aim), // which way, a step at a time
+      dy: -Math.cos(state.aim),
+      due: 0, // how far it's owed, from frames that weren't a whole number of steps
       colour: state.rainbow ? RAINBOW : colour,
     },
     // A rainbow shot is extra: the bubble that was loaded stays loaded
@@ -140,27 +143,38 @@ export function fire(state) {
 // Swap the loaded bubble with the next one
 export const swap = (state) => (state.shot || !state.ammo[1] ? state : { ...state, ammo: [state.ammo[1], state.ammo[0]] })
 
-// The path a shot would take from here, bouncing off the walls, until it'd hit the ceiling or
-// something: for the aiming guide. `reach` limits how far it goes.
-export function path(state, reach = Infinity) {
-  const points = [[launcherX(state), LAUNCHER.y]]
-  let [x, y] = points[0]
-  let vx = Math.sin(state.aim)
-  const vy = -Math.cos(state.aim)
-  let travelled = 0
-  while (travelled < reach && y > topOf(state)) {
-    x += vx * 4
-    y += vy * 4
-    travelled += 4
-    if (x < R || x > state.width - R) {
-      x = Math.max(R, Math.min(state.width - R, x))
-      vx = -vx
-      points.push([x, y])
-    }
-    if (every(state).some(([r, c]) => Math.hypot(...centre(state, r, c).map((v, i) => v - [x, y][i])) < D * 0.85)) break
+// A shot one step along, off the side walls (`bounced` if it did); true once it's touching the
+// ceiling or a bubble. `bubbles`: the centres of the ones on the board.
+function advance(s, shot, bubbles) {
+  shot.x += shot.dx * STEP
+  shot.y += shot.dy * STEP
+  shot.bounced = false
+  if (shot.x < R || shot.x > s.width - R) {
+    shot.x = Math.max(R, Math.min(s.width - R, shot.x))
+    shot.dx = -shot.dx
+    shot.bounced = true
   }
-  points.push([x, y])
-  return points
+  return shot.y - R <= topOf(s) || bubbles.some(([bx, by]) => Math.hypot(bx - shot.x, by - shot.y) < D * 0.85)
+}
+const centres = (s) => every(s).map(([r, c]) => centre(s, r, c))
+
+// Where a shot fired now would go: its path (the launcher, each bounce, where it stops) and the
+// cell it'd land in. For the aiming guide, and the ghost bubble there. `reach` cuts the path
+// short (with no landing), for just a few dots.
+export function aimed(state, reach = Infinity) {
+  const shot = { x: launcherX(state), y: LAUNCHER.y, dx: Math.sin(state.aim), dy: -Math.cos(state.aim) }
+  const points = [[shot.x, shot.y]]
+  const bubbles = centres(state)
+  for (let travelled = 0; travelled < reach; travelled += STEP) {
+    const hit = advance(state, shot, bubbles)
+    if (shot.bounced) points.push([shot.x, shot.y])
+    if (hit) {
+      points.push([shot.x, shot.y])
+      return { points, cell: snap(state, shot.x, shot.y) }
+    }
+  }
+  points.push([shot.x, shot.y])
+  return { points, cell: null }
 }
 
 // Where a shot that's stopped at (x, y) settles: the nearest empty cell
@@ -277,16 +291,12 @@ export function step(state, dt, input = {}, random = Math.random) {
 
   const shot = s.shot
   if (!shot) return s
-  const h = dt / SUBSTEPS
-  for (let i = 0; i < SUBSTEPS; i++) {
-    shot.x += shot.vx * h
-    shot.y += shot.vy * h
-    if (shot.x < R) [shot.x, shot.vx] = [R, Math.abs(shot.vx)]
-    if (shot.x > s.width - R) [shot.x, shot.vx] = [s.width - R, -Math.abs(shot.vx)]
-    const hit =
-      shot.y - R <= topOf(s) ||
-      every(s).some(([r, c]) => Math.hypot(...centre(s, r, c).map((v, j) => v - [shot.x, shot.y][j])) < D * 0.85)
-    if (hit) {
+  // As many whole steps as this frame's worth of travel, the rest carried over to the next
+  shot.due += SHOT_SPEED * dt
+  const bubbles = centres(s)
+  while (shot.due >= STEP) {
+    shot.due -= STEP
+    if (advance(s, shot, bubbles)) {
       s.shot = null
       const cell = snap(s, shot.x, shot.y)
       if (cell) land(s, cell.r, cell.c, shot.colour, random)

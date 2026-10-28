@@ -32,7 +32,7 @@ test('bubbles: aim stays within limits, and a shot flies off the way it points',
   s = bubbles.aimAt(s, 0, bubbles.LAUNCHER.y)
   assert.ok(s.aim < -1 && s.aim >= -1.36)
   s = bubbles.fire(bubbles.aimAt(s, s.width / 2, 0))
-  assert.ok(s.shot && Math.abs(s.shot.vx) < 1 && s.shot.vy < 0)
+  assert.ok(s.shot && Math.abs(s.shot.dx) < 0.01 && s.shot.dy < 0)
 })
 
 test('bubbles: three of a colour together pop, and what was hanging off them falls', () => {
@@ -98,10 +98,23 @@ test('bubbles: clearing the board brings the next level', () => {
   assert.ok(count(landed) > 0)
 })
 
-test('bubbles settings: six colours, a full aiming guide, a wider board on a desktop', () => {
+test('bubbles: the aim shows exactly where a shot will land, bounces and all', () => {
+  // Aimed hard at the left wall: it bounces off it, then lands where the ghost said
+  for (const x of [0, 40, 120, 300]) {
+    const s = bubbles.aimAt(bubbles.start({}, Math.random), x, bubbles.LAUNCHER.y - 60)
+    const { points, cell } = bubbles.aimed(s)
+    if (x === 0) assert.ok(points.length > 2) // the launcher, a bounce, where it stops
+    const landed = flyOut(bubbles.fire({ ...s, ammo: [9, 9] }))
+    // Colour 9 isn't on the board, so it can't have made a match and popped: it's where it landed
+    assert.equal(landed.grid[cell.r][cell.c]?.colour, 9, `aimed at ${x}`)
+  }
+})
+
+test('bubbles settings: six colours, no aiming guide, a wider board on a desktop', () => {
   assert.equal(bubbles.start({ six: true }, first).colours, 6)
   assert.equal(bubbles.start({}, first).colours, 4)
-  assert.ok(bubbles.path(bubbles.start({}, first)).length >= 2)
+  assert.equal(bubbles.start({ noguide: true }, first).guide, false)
+  assert.equal(bubbles.aimed(bubbles.start({}, first), 140).cell, null)
   assert.ok(bubbles.start({ width: 840 }, first).cols > bubbles.start({}, first).cols)
-  assert.equal(bubbles.bubblesGame({ six: true, guide: true }), 'bubbles-six-guide')
+  assert.equal(bubbles.bubblesGame({ six: true, noguide: true }), 'bubbles-six-noguide')
 })

@@ -84,6 +84,11 @@ test.describe("Snake", () => {
 	test("an arrow key starts it, and left alone it runs into the wall", async ({
 		page,
 	}) => {
+		// The fruit in the bottom corner, out of its way (by chance it was sometimes eaten on the way
+		// up, scoring a point)
+		await page.addInitScript(() => {
+			Math.random = () => 0.99;
+		});
 		await page.goto("/games/snake");
 		await expect(page.getByText("Swipe to start")).toBeVisible();
 		await page.keyboard.press("ArrowUp");

@@ -13,11 +13,11 @@ import {
   SETTINGS,
   WIDTH,
   aimAt,
+  aimed,
   bubblesGame,
   centre,
   fire,
   launcherX,
-  path,
   start,
   step,
   swap,
@@ -153,14 +153,30 @@ function draw(ctx, game, head, looks, time) {
   ctx.globalAlpha = 1
   for (const f of game.falls) bubble(ctx, f.x, f.y, f.colour)
 
-  // The aim: a few dots, or the whole path (with the aiming guide)
-  ctx.fillStyle = 'rgb(46 42 69 / 0.45)'
-  const points = path(game, game.guide ? Infinity : 140)
-  for (let i = 1; i < points.length; i++) {
-    const [ax, ay] = points[i - 1]
-    const [bx, by] = points[i]
-    const length = Math.hypot(bx - ax, by - ay)
-    for (let d = 18; d < length; d += 16) ctx.fillRect(ax + ((bx - ax) * d) / length - 2, ay + ((by - ay) * d) / length - 2, 4, 4)
+  // The aim: the whole path, off the walls and all, and a ghost of the loaded bubble where it'll
+  // land (or just a few dots, with No aiming guide). Not while a shot's already flying.
+  if (!game.shot && !game.over) {
+    const { points, cell } = aimed(game, game.guide ? Infinity : 140)
+    ctx.fillStyle = 'rgb(46 42 69 / 0.45)'
+    for (let i = 1; i < points.length; i++) {
+      const [ax, ay] = points[i - 1]
+      const [bx, by] = points[i]
+      const length = Math.hypot(bx - ax, by - ay)
+      for (let d = 18; d < length; d += 16) ctx.fillRect(ax + ((bx - ax) * d) / length - 2, ay + ((by - ay) * d) / length - 2, 4, 4)
+    }
+    if (cell) {
+      const [gx, gy] = centre(game, cell.r, cell.c)
+      ctx.globalAlpha = 0.4 + 0.15 * Math.sin(time * 6)
+      bubble(ctx, gx, gy, game.rainbow ? RAINBOW : game.ammo[0])
+      ctx.globalAlpha = 1
+      ctx.strokeStyle = '#fff'
+      ctx.lineWidth = 2
+      ctx.setLineDash([5, 4])
+      ctx.beginPath()
+      ctx.arc(gx, gy, R + 2, 0, Math.PI * 2)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
   }
 
   // The launcher, with the head beside it looking where it aims, and the next bubble
