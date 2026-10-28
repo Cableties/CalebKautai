@@ -10,18 +10,17 @@ import SoundToggle from '../components/SoundToggle.jsx'
 import useWide, { WIDE_WIDTH } from '../components/useWide.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { feedback } from '../lib/feedback.js'
+import { approach, themeAt } from '../lib/themes.js'
 
 // Bricks: the head is the ball, knocking out rows of pastel bricks off a paddle. The rules are in
 // lib/bricks.js; this draws them on a canvas and handles input: drag a finger to slide the paddle
 // and tap to launch, or the arrow keys and Space. Power-up bricks glow, and show what they do.
-// Settings are behind the cog, and each mix has its own high scores.
+// Settings are behind the cog, and each mix has its own high scores. Each level has a new backdrop.
 const LEFT_KEYS = ['ArrowLeft', 'a', 'A']
 const RIGHT_KEYS = ['ArrowRight', 'd', 'D']
 const LAUNCH_KEYS = [' ', 'ArrowUp', 'w', 'W', 'Enter']
 const HUD = 44
 const COLOURS = {
-  skyTop: '#e7e0fa',
-  skyBottom: '#fbeaf2',
   rows: ['#f7b6d2', '#ffc9a8', '#fdeca0', '#bfe8d6', '#a9d4f2', '#d9ccf5', '#f7b6d2', '#ffc9a8'],
   outline: '#2e2a45',
   paddle: '#e0559a',
@@ -41,14 +40,35 @@ function darker(hex, amount) {
   return `rgb(${to(r, ir)} ${to(g, ig)} ${to(b, ib)})`
 }
 
-function draw(ctx, game, head, looks, time) {
+// Each level its own backdrop, going round: lavender, peach, sky blue, mint and lemon, each with
+// big soft circles drifting about behind the bricks
+const LEVELS = [
+  { top: '#e7e0fa', bottom: '#fbeaf2', shapes: '#ffffff' },
+  { top: '#ffe0cc', bottom: '#fcd3e1', shapes: '#fff1e6' },
+  { top: '#d3e9fa', bottom: '#eef6fd', shapes: '#ffffff' },
+  { top: '#d6f2e3', bottom: '#f2fbea', shapes: '#ffffff' },
+  { top: '#fbf1c4', bottom: '#fde6d6', shapes: '#fffbe8' },
+]
+const noise = (i, n) => Math.abs(Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1
+
+// `level`: which level's backdrop, fading from one to the next
+function draw(ctx, game, head, looks, time, level) {
   const W = game.width // the screen's width: wider on a desktop
   const glow = 0.5 + 0.5 * Math.sin(time * 6)
+  const theme = themeAt(LEVELS, level).palette
   const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
-  sky.addColorStop(0, COLOURS.skyTop)
-  sky.addColorStop(1, COLOURS.skyBottom)
+  sky.addColorStop(0, theme.top)
+  sky.addColorStop(1, theme.bottom)
   ctx.fillStyle = sky
   ctx.fillRect(0, 0, W, HEIGHT)
+  ctx.fillStyle = theme.shapes
+  ctx.globalAlpha = 0.45
+  for (let i = 0; i < 8; i++) {
+    ctx.beginPath()
+    ctx.arc(noise(i, 1) * W + Math.sin(time * 0.2 + i) * 20, HUD + noise(i, 2) * (HEIGHT - HUD) + Math.cos(time * 0.25 + i) * 20, 30 + noise(i, 3) * 70, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  ctx.globalAlpha = 1
 
   // Bricks: a tough one is darker, and shows a crack once it's been hit
   ctx.lineWidth = 2.5
@@ -254,6 +274,7 @@ export default function Bricks() {
     const ctx = el.getContext('2d')
     let last = performance.now()
     let animation
+    let level = 0 // the level whose backdrop is showing (lib/themes.js), fading to the next
 
     function resize() {
       const ratio = devicePixelRatio || 1
@@ -280,7 +301,8 @@ export default function Bricks() {
         }
       }
       ctx.setTransform(el.width / game.current.width, 0, 0, el.height / HEIGHT, 0, 0)
-      draw(ctx, game.current, head.current, looks.current, now / 1000)
+      level = approach(level, game.current.level - 1, dt)
+      draw(ctx, game.current, head.current, looks.current, now / 1000, level)
       animation = requestAnimationFrame(tick)
     }
     animation = requestAnimationFrame(tick)

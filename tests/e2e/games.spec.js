@@ -182,6 +182,23 @@ test.describe("Bubbles", () => {
 		});
 	});
 
+	test("the aiming guide switches on and off mid-game, and stays as it was left", async ({ page }) => {
+		await page.goto("/games/bubbles");
+		const guide = page.getByRole("button", { name: "Aiming guide" });
+		await expect(guide).toHaveAttribute("aria-pressed", "true");
+		await page.keyboard.press(" ");
+		await expect(page.getByText("Tap to start")).toBeHidden();
+		await guide.click();
+		await expect(guide).toHaveAttribute("aria-pressed", "false");
+		// Still playing: the click didn't fire or pause
+		await expect(page.getByRole("button", { name: "Pause" })).toBeVisible();
+		await page.keyboard.press("g");
+		await expect(guide).toHaveAttribute("aria-pressed", "true");
+		await page.keyboard.press("g");
+		await page.reload();
+		await expect(page.getByRole("button", { name: "Aiming guide" })).toHaveAttribute("aria-pressed", "false");
+	});
+
 	test("a wide window gets a wider board, and a phone a tall one", async ({ page }) => {
 		await page.goto("/games/bubbles");
 		const { width, height } = await page.locator(".game-stage").boundingBox();

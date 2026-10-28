@@ -9,10 +9,22 @@ import SoundToggle from '../components/SoundToggle.jsx'
 import { feedback } from '../lib/feedback.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { cheatOn } from '../lib/gameHead.js'
+import { themeAt } from '../lib/themes.js'
 
 // Bonk: whack-a-mole with Caleb's pixel head. The rules are in lib/bonk.js; the holes are buttons,
 // so it works with a mouse, a finger or a keyboard. Settings (decoys, frenzy) are behind the cog,
-// and each mix has its own high scores.
+// and each mix has its own high scores. Over the round the day goes by: the board starts out in the
+// morning and ends at dusk.
+const DAY = [
+  { board: '#bfe8d6', turf: '#a3dcc3' }, // morning
+  { board: '#d8efb6', turf: '#c2e29c' }, // midday
+  { board: '#fbd4b5', turf: '#f1bc96' }, // sunset
+  { board: '#d6cdf0', turf: '#bfb3e5' }, // dusk (light enough for the score on it)
+]
+function sky(left) {
+  const { board, turf } = themeAt(DAY, (1 - left / ROUND_MS) * (DAY.length - 1)).palette
+  return { '--bonk-board': board, '--bonk-turf': turf }
+}
 const NAMES = { caleb: 'Caleb', amber: 'Amber' }
 
 // Whoever's playing, sized so their face (sprite.art) is just under half the hole's width, whatever
@@ -191,7 +203,7 @@ export default function Bonk() {
       <p className="lede">My head pops up. You bonk it. 30 seconds, as many as you can.</p>
 
       <div className="game-layout">
-        <div className="bonk" ref={board}>
+        <div className="bonk" ref={board} style={sky(left)}>
           <div className="bonk-bar">
             <p>
               Score <strong>{score}</strong>

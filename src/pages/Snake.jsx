@@ -10,12 +10,14 @@ import SoundToggle from '../components/SoundToggle.jsx'
 import useWide from '../components/useWide.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { feedback } from '../lib/feedback.js'
+import { approach, themeAt } from '../lib/themes.js'
 
 // Snake: the head leads a pastel tail round the board, eating pixel fruit. The rules are in
 // lib/snake.js; this draws them on a canvas and handles input: swipe, or the arrow keys / WASD.
 // The snake glides between cells rather than jumping: each segment is drawn partway from where it
 // was to where it's going, as far as the next move has come. Settings (wrap-around walls,
-// obstacles, portals) are behind the cog, and each mix has its own high scores.
+// obstacles, portals) are behind the cog, and each mix has its own high scores. The seasons change
+// as it grows.
 const WIDTH = 360
 const HEIGHT = 640
 const CELL = WIDTH / COLS
@@ -32,7 +34,6 @@ const KEYS = {
   d: 'right',
 }
 const COLOURS = {
-  board: ['#dff3e8', '#d1ecdd'],
   body: '#f7b6d2',
   shine: '#fcd9e8',
   outline: '#2e2a45',
@@ -106,15 +107,46 @@ function bodyPoints(game) {
   })
 }
 
-function draw(ctx, game, head, looks, time) {
+// The seasons, one after another as the snake grows: the board's chequer, the little things dotted
+// on it, and what's falling (petals, leaves or snow, faded in and out by their numbers)
+const SEASONS = [
+  { board: ['#dff3e8', '#d1ecdd'], dots: '#f7b6d2', petals: 1, leaves: 0, snow: 0 }, // spring
+  { board: ['#ecf6cc', '#deeeb6'], dots: '#f5c94a', petals: 0, leaves: 0, snow: 0 }, // summer
+  { board: ['#f7e5c8', '#efd6b1'], dots: '#e2864a', petals: 0, leaves: 1, snow: 0 }, // autumn
+  { board: ['#eef4fb', '#e0e9f4'], dots: '#ffffff', petals: 0, leaves: 0, snow: 1 }, // winter
+]
+const SNACKS_PER_SEASON = 8
+const FALLING = { petals: '#f7b6d2', leaves: '#e2864a', snow: '#ffffff' }
+const noise = (i, n) => Math.abs(Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1
+
+// `season`: which season's look, fading from one to the next
+function draw(ctx, game, head, looks, time, season) {
   const W = game.cols * CELL // the board's width: wider on a desktop
-  // The board, chequered
+  const theme = themeAt(SEASONS, season).palette
+  // The board, chequered, with a few little things dotted about it
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < game.cols; x++) {
-      ctx.fillStyle = COLOURS.board[(x + y) % 2]
+      ctx.fillStyle = theme.board[(x + y) % 2]
       ctx.fillRect(x * CELL, TOP + y * CELL, CELL, CELL)
+      const i = y * WIDE_COLS + x
+      if (noise(i, 1) < 0.12) {
+        ctx.fillStyle = theme.dots
+        ctx.fillRect(x * CELL + 6 + noise(i, 2) * (CELL - 16), TOP + y * CELL + 6 + noise(i, 3) * (CELL - 16), 4, 4)
+      }
     }
   }
+  // Petals, leaves or snow drifting down
+  for (const [kind, colour] of Object.entries(FALLING)) {
+    if (!theme[kind]) continue
+    ctx.globalAlpha = theme[kind] * 0.7
+    ctx.fillStyle = colour
+    for (let i = 0; i < 24; i++) {
+      const fall = (time * (18 + noise(i, 4) * 18) + noise(i, 5) * ROWS * CELL) % (ROWS * CELL)
+      const x = (noise(i, 6) * W + Math.sin(time + i) * 12 + W) % W
+      ctx.fillRect(x, TOP + fall, kind === 'snow' ? 3 : 5, 3)
+    }
+  }
+  ctx.globalAlpha = 1
   // Wrap-around walls: a dashed edge, since it's open
   if (game.wrap) {
     ctx.strokeStyle = COLOURS.outline
@@ -230,6 +262,7 @@ export default function Snake() {
   recordRef.current = record
   const phaseRef = useRef(phase)
   phaseRef.current = phase
+  const season = useRef(0) // the season showing (lib/themes.js), fading to the next
   const { pause, resume } = usePause(phaseRef, setPhase, {
     // Let go of anything held, so it isn't still held on the way back
     onPause: () => {
@@ -291,7 +324,8 @@ export default function Snake() {
         }
       }
       ctx.setTransform(el.width / (game.current.cols * CELL), 0, 0, el.height / HEIGHT, 0, 0)
-      draw(ctx, game.current, head.current, looks.current, now / 1000)
+      season.current = approach(season.current, Math.floor(game.current.score / SNACKS_PER_SEASON), dt)
+      draw(ctx, game.current, head.current, looks.current, now / 1000, season.current)
       animation = requestAnimationFrame(tick)
     }
     animation = requestAnimationFrame(tick)

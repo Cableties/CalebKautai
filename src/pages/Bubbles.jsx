@@ -29,17 +29,76 @@ import SoundToggle from '../components/SoundToggle.jsx'
 import useWide, { WIDE_WIDTH } from '../components/useWide.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { feedback } from '../lib/feedback.js'
+import { approach, themeAt } from '../lib/themes.js'
 
 // Bubbles: a bubble shooter, with the head in the launcher, looking where it aims. The rules are in
 // lib/bubbles.js; this draws them on a canvas and handles input: point (or drag a finger) to aim and
 // let go to fire, tap the next bubble to swap it in; or the arrow keys, Space to fire and Down to
-// swap. Settings are behind the cog, and each mix has its own high scores.
+// swap. Settings are behind the cog, and each mix has its own high scores. The aiming guide has its
+// own button, to switch on and off mid-game (or press G).
 const LEFT_KEYS = ['ArrowLeft', 'a', 'A']
 const RIGHT_KEYS = ['ArrowRight', 'd', 'D']
 const FIRE_KEYS = [' ', 'ArrowUp', 'w', 'W', 'Enter']
 const SWAP_KEYS = ['ArrowDown', 's', 'S']
 const NEXT = { dx: 56, r: R * 0.75 } // the next bubble, beside the launcher
 const INK = '#2e2a45'
+const GUIDE_KEYS = ['g', 'G']
+// Each level its own sky, going round: lavender with clouds, underwater with bubbles rising, a
+// sunset, a spring morning, and a starry night. The numbers fade each one's bits in and out.
+const LEVELS = [
+  { top: '#dcd2f7', bottom: '#d4ecf7', ceiling: '#b9a9e8', dots: '#2e2a45', clouds: 1, rising: 0, sun: 0, stars: 0 },
+  { top: '#a9dcf0', bottom: '#6fb7dc', ceiling: '#4f97c4', dots: '#16365a', clouds: 0, rising: 1, sun: 0, stars: 0 },
+  { top: '#ffd3b6', bottom: '#f7b0cc', ceiling: '#ee8fa6', dots: '#2e2a45', clouds: 0, rising: 0, sun: 1, stars: 0 },
+  { top: '#d9f3e2', bottom: '#fdf2c2', ceiling: '#9fd8b4', dots: '#2e2a45', clouds: 1, rising: 0, sun: 0, stars: 0 },
+  { top: '#2f2a63', bottom: '#5c4c9c', ceiling: '#211d4b', dots: '#ffffff', clouds: 0, rising: 0, sun: 0, stars: 1 },
+]
+const noise = (i, n) => Math.abs(Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1
+
+// The level's sky and what's in it
+function backdrop(ctx, W, theme, time) {
+  const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
+  sky.addColorStop(0, theme.top)
+  sky.addColorStop(1, theme.bottom)
+  ctx.fillStyle = sky
+  ctx.fillRect(0, 0, W, HEIGHT)
+  if (theme.sun > 0) {
+    ctx.globalAlpha = theme.sun * 0.8
+    ctx.fillStyle = '#ffe9a0'
+    ctx.beginPath()
+    ctx.arc(W / 2, LINE_Y - 10, 120, 0, Math.PI * 2)
+    ctx.fill()
+  }
+  for (let i = 0; i < 30; i++) {
+    const x = noise(i, 1) * W
+    if (theme.stars > 0) {
+      ctx.globalAlpha = theme.stars * (0.5 + 0.5 * Math.sin(time * 2 + i))
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(x, HUD + noise(i, 2) * (LINE_Y - HUD), 2, 2)
+    }
+    if (theme.rising > 0) {
+      // Little bubbles rising, swaying as they go
+      const y = HEIGHT - ((time * (20 + noise(i, 3) * 30) + noise(i, 4) * HEIGHT) % (HEIGHT - HUD))
+      ctx.globalAlpha = theme.rising * 0.5
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.arc(x + Math.sin(time * 2 + i) * 6, y, 2 + noise(i, 5) * 4, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+    if (theme.clouds > 0 && i < 5) {
+      const cx = ((x + time * 8) % (W + 120)) - 60
+      const cy = 200 + noise(i, 6) * 300
+      ctx.globalAlpha = theme.clouds * 0.6
+      ctx.fillStyle = '#ffffff'
+      for (const [dx, dy, r] of [[0, 0, 26], [24, 6, 20], [-24, 8, 18]]) {
+        ctx.beginPath()
+        ctx.arc(cx + dx, cy + dy, r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+  }
+  ctx.globalAlpha = 1
+}
 
 function bubble(ctx, x, y, colour, r = R) {
   if (colour === RAINBOW) {
@@ -107,17 +166,15 @@ function power(ctx, kind, x, y, time) {
   }
 }
 
-function draw(ctx, game, head, looks, time) {
+// `level`: which level's look, fading from one to the next as each is cleared
+function draw(ctx, game, head, looks, time, level) {
   const W = game.width // the screen's width: wider on a desktop
-  const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
-  sky.addColorStop(0, '#dcd2f7')
-  sky.addColorStop(1, '#d4ecf7')
-  ctx.fillStyle = sky
-  ctx.fillRect(0, 0, W, HEIGHT)
+  const theme = themeAt(LEVELS, level).palette
+  backdrop(ctx, W, theme, time)
 
   // The ceiling, lower with each drop
   const [, firstY] = centre(game, 0, 0)
-  ctx.fillStyle = '#b9a9e8'
+  ctx.fillStyle = theme.ceiling
   ctx.fillRect(0, HUD, W, firstY - R - HUD)
   ctx.fillStyle = INK
   ctx.fillRect(0, firstY - R - 3, W, 3)
@@ -154,16 +211,18 @@ function draw(ctx, game, head, looks, time) {
   for (const f of game.falls) bubble(ctx, f.x, f.y, f.colour)
 
   // The aim: the whole path, off the walls and all, and a ghost of the loaded bubble where it'll
-  // land (or just a few dots, with No aiming guide). Not while a shot's already flying.
+  // land (or just a few dots, with the guide switched off). Not while a shot's already flying.
   if (!game.shot && !game.over) {
     const { points, cell } = aimed(game, game.guide ? Infinity : 140)
-    ctx.fillStyle = 'rgb(46 42 69 / 0.45)'
+    ctx.fillStyle = theme.dots
+    ctx.globalAlpha = 0.5
     for (let i = 1; i < points.length; i++) {
       const [ax, ay] = points[i - 1]
       const [bx, by] = points[i]
       const length = Math.hypot(bx - ax, by - ay)
       for (let d = 18; d < length; d += 16) ctx.fillRect(ax + ((bx - ax) * d) / length - 2, ay + ((by - ay) * d) / length - 2, 4, 4)
     }
+    ctx.globalAlpha = 1
     if (cell) {
       const [gx, gy] = centre(game, cell.r, cell.c)
       ctx.globalAlpha = 0.4 + 0.15 * Math.sin(time * 6)
@@ -240,6 +299,61 @@ function effects(g) {
   if (g.lowered) feedback('whiff')
 }
 
+// The aiming guide, on to start with and remembered in this browser. Returns [on, toggle(), ref]:
+// toggle returns the new setting, and the ref is for the game loop and key handler.
+function useGuide() {
+  const [on, setOn] = useState(true)
+  const ref = useRef(on)
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('bubbles-guide') === 'off') {
+        ref.current = false
+        setOn(false)
+      }
+    } catch {
+      // Storage blocked: on, then
+    }
+  }, [])
+  function toggle() {
+    ref.current = !ref.current
+    setOn(ref.current)
+    try {
+      localStorage.setItem('bubbles-guide', ref.current ? 'on' : 'off')
+    } catch {
+      // Not remembered, then
+    }
+    return ref.current
+  }
+  return [on, toggle, ref]
+}
+
+// The aiming guide's button: a target, crossed out while it's off. Taps on it stay on it, so they
+// don't aim or fire.
+function GuideButton({ on, onToggle }) {
+  return (
+    <button
+      type="button"
+      className="game-guide"
+      aria-label="Aiming guide"
+      aria-pressed={on}
+      title={`Aiming guide: ${on ? 'on' : 'off'} (G)`}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        onToggle()
+        // Let go of focus after a tap or click, so Space fires rather than pressing it again
+        if (e.detail) e.currentTarget.blur()
+      }}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="7" />
+        <circle cx="12" cy="12" r="2.5" />
+        <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+        {!on && <path d="M4 4l16 16" />}
+      </svg>
+    </button>
+  )
+}
+
 export default function Bubbles() {
   const canvas = useRef(null)
   const stage = useRef(null)
@@ -259,6 +373,8 @@ export default function Bubbles() {
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null)
   const [settings, toggleSetting, settingsRef] = useGameSettings('bubbles', SETTINGS)
+  const [guide, toggleGuide, guideRef] = useGuide()
+  const level = useRef(0) // the level whose look is showing (lib/themes.js), fading to the next
   const GAME = bubblesGame(settings)
   const [best, record] = useBest(GAME)
   const { run, begin } = useRun(GAME)
@@ -279,7 +395,12 @@ export default function Bubbles() {
 
   const fresh = () => {
     setBoardWide(wideRef.current)
-    return start({ ...settingsRef.current, easy: cheatOn('easy'), width: wideRef.current ? WIDE_WIDTH : WIDTH })
+    return start({
+      ...settingsRef.current,
+      guide: guideRef.current,
+      easy: cheatOn('easy'),
+      width: wideRef.current ? WIDE_WIDTH : WIDTH,
+    })
   }
 
   // New settings (or the saved ones, once they load), or a different shaped window: a fresh board
@@ -330,7 +451,8 @@ export default function Bubbles() {
         }
       }
       ctx.setTransform(el.width / game.current.width, 0, 0, el.height / HEIGHT, 0, 0)
-      draw(ctx, game.current, head.current, looks.current, now / 1000)
+      level.current = approach(level.current, game.current.level - 1, dt)
+      draw(ctx, game.current, head.current, looks.current, now / 1000, level.current)
       animation = requestAnimationFrame(tick)
     }
     animation = requestAnimationFrame(tick)
@@ -347,6 +469,11 @@ export default function Bubbles() {
     setNewBest(false)
     setPhase('playing')
     beginRef.current()
+  }
+  // The aiming guide on or off, there and then
+  function switchGuide() {
+    const on = toggleGuide()
+    if (game.current) game.current = { ...game.current, guide: on }
   }
   function shoot() {
     if (phaseRef.current !== 'playing') return
@@ -399,6 +526,10 @@ export default function Bubbles() {
         else shoot()
         return
       }
+      if (GUIDE_KEYS.includes(e.key)) {
+        if (pressed && phaseRef.current !== 'over') switchGuide()
+        return
+      }
       if (SWAP_KEYS.includes(e.key)) {
         e.preventDefault()
         if (pressed && phaseRef.current === 'playing') game.current = swap(game.current)
@@ -428,7 +559,7 @@ export default function Bubbles() {
       <h1 className="page-title">Bubbles</h1>
       <p className="lede">
         Aim with your finger (or the arrow keys) and let go to fire. Three of a colour pop. Tap the next bubble, or press
-        Down, to swap it in.
+        Down, to swap it in. The target button (or G) switches the aiming guide on and off.
       </p>
 
       <div className="game-layout">
@@ -460,6 +591,7 @@ export default function Bubbles() {
             </div>
           )}
           {phase === 'playing' && <PauseButton onPause={pause} />}
+          {(phase === 'ready' || phase === 'playing') && <GuideButton on={guide} onToggle={switchGuide} />}
           {phase === 'paused' && <Paused onResume={resume} />}
           <GameSettings options={SETTINGS} settings={settings} onToggle={toggleSetting} hidden={phase === 'playing' || phase === 'paused'} />
         </div>

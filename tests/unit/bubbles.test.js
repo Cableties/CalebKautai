@@ -110,11 +110,16 @@ test('bubbles: the aim shows exactly where a shot will land, bounces and all', (
   }
 })
 
-test('bubbles settings: six colours, no aiming guide, a wider board on a desktop', () => {
+test('bubbles settings: six colours, a wider board on a desktop', () => {
   assert.equal(bubbles.start({ six: true }, first).colours, 6)
   assert.equal(bubbles.start({}, first).colours, 4)
-  assert.equal(bubbles.start({ noguide: true }, first).guide, false)
-  assert.equal(bubbles.aimed(bubbles.start({}, first), 140).cell, null)
   assert.ok(bubbles.start({ width: 840 }, first).cols > bubbles.start({}, first).cols)
-  assert.equal(bubbles.bubblesGame({ six: true, noguide: true }), 'bubbles-six-noguide')
+  assert.equal(bubbles.bubblesGame({ six: true }), 'bubbles-six')
+})
+
+test('bubbles: the aiming guide is on to start with, switched off mid-game, and no board of its own', () => {
+  assert.equal(bubbles.start({}, first).guide, true)
+  assert.equal(bubbles.start({ guide: false }, first).guide, false)
+  assert.equal(bubbles.aimed(bubbles.start({}, first), 140).cell, null)
+  assert.ok(!bubbles.BUBBLES_GAMES.some((g) => g.includes('guide')))
 })

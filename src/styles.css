@@ -3782,7 +3782,8 @@ a {
   width: min(440px, calc(100dvh - 90px));
   max-width: 100%;
   padding: 16px;
-  background: #bfe8d6;
+  background: var(--bonk-board, #bfe8d6);
+  transition: background-color 0.3s linear;
   border: 3px solid var(--ink);
   border-radius: 20px;
 }
@@ -3809,7 +3810,7 @@ a {
   aspect-ratio: 1;
   padding: 0;
   overflow: hidden;
-  background: radial-gradient(ellipse 70% 30% at 50% 82%, #2e2a45 0 60%, transparent 62%), #a3dcc3;
+  background: radial-gradient(ellipse 70% 30% at 50% 82%, #2e2a45 0 60%, transparent 62%), var(--bonk-turf, #a3dcc3);
   border: 0;
   border-radius: 16px;
   cursor: pointer;
@@ -4079,6 +4080,38 @@ a {
   fill: currentColor;
 }
 .game-pause:focus-visible {
+  outline: 3px solid var(--blue-ink);
+  outline-offset: 2px;
+}
+/* Bubbles' aiming guide switch, under the pause button (or the cog) */
+.game-guide {
+  position: absolute;
+  top: 104px;
+  right: 10px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  color: #fff;
+  background: rgb(46 42 69 / 0.6);
+  border: 2px solid rgb(255 255 255 / 0.5);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.game-guide[aria-pressed='false'] {
+  opacity: 0.65;
+}
+.game-guide svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.game-guide:focus-visible {
   outline: 3px solid var(--blue-ink);
   outline-offset: 2px;
 }

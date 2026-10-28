@@ -34,7 +34,6 @@ const POWER_CHANCE = 0.06 // of each bubble in a new level
 export const SETTINGS = [
   { id: 'nopowers', name: 'No power-ups', note: 'Just bubbles.' },
   { id: 'six', name: 'Six colours', note: 'Every colour from the start. Much harder.' },
-  { id: 'noguide', name: 'No aiming guide', note: 'Just a few dots to aim by: no path, no ghost bubble.' },
 ]
 export const bubblesGame = (settings = {}) => settingsGame('bubbles', SETTINGS, settings)
 export const BUBBLES_GAMES = allSettingsGames('bubbles', SETTINGS)
@@ -91,14 +90,15 @@ function level(s, random) {
   s.ammo = [nextColour(s, random), nextColour(s, random)]
 }
 
-// `width`: the screen's width (wider on a desktop)
-export function start({ easy = false, nopowers = false, six = false, noguide = false, width = WIDTH } = {}, random = Math.random) {
+// `width`: the screen's width (wider on a desktop). `guide`: the aiming guide, switched on and off
+// mid-game (it's up to the player, so it doesn't get its own high scores).
+export function start({ easy = false, nopowers = false, six = false, guide = true, width = WIDTH } = {}, random = Math.random) {
   const s = {
     width,
     cols: colsFor(width),
     easy,
     six,
-    guide: !noguide || easy, // the whole path and a ghost where it'll land (Easy Mode always has it)
+    guide, // the whole path and a ghost where it'll land, or just a few dots
     powers: !nopowers,
     level: 1,
     score: 0,

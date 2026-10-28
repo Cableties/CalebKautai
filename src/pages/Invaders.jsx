@@ -10,11 +10,13 @@ import SoundToggle from '../components/SoundToggle.jsx'
 import useWide, { WIDE_WIDTH } from '../components/useWide.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { feedback } from '../lib/feedback.js'
+import { approach, themeAt } from '../lib/themes.js'
 
 // Invaders: pixel aliens march down on the head, riding a cannon along the bottom. The other head
 // flies over now and then in a saucer, for bonus points. The rules are in lib/invaders.js; this
 // draws them on a canvas and handles input: hold a finger down to slide and fire, or the arrow keys
 // and Space. Settings (no bunkers, rapid fire) are behind the cog, and each mix has its own scores.
+// Each wave is fought somewhere new in space.
 const LEFT_KEYS = ['ArrowLeft', 'a', 'A']
 const RIGHT_KEYS = ['ArrowRight', 'd', 'D']
 const FIRE_KEYS = [' ', 'ArrowUp', 'w', 'W']
@@ -36,7 +38,40 @@ const OCTOPUS = [
 const ROWS = [SQUID, CRAB, CRAB, OCTOPUS]
 const ROW_COLOURS = ['#f7b6d2', '#a9d4f2', '#a9d4f2', '#bfe8d6']
 const CANNON = ['......#......', '.....###.....', '.###########.', '#############', '#############', '#############']
-const COLOURS = { space: '#0d0c16', star: '#d9ccf5', cannon: '#7dffb2', bunker: '#7dffb2', shot: '#fff', bomb: '#ffe27a', hud: '#bfe8d6' }
+const COLOURS = { star: '#d9ccf5', cannon: '#7dffb2', bunker: '#7dffb2', shot: '#fff', bomb: '#ffe27a', hud: '#bfe8d6' }
+// Each wave somewhere else in space, going round: its own black, a glowing cloud of gas and a
+// planet in the distance (where, as fractions of the screen, and how big)
+const SECTORS = [
+  { space: '#0d0c16', nebula: '#2f2457', planet: '#f7b6d2', px: 0.78, py: 0.55, pr: 46 },
+  { space: '#08131d', nebula: '#173f4f', planet: '#7fd3c4', px: 0.2, py: 0.6, pr: 30 },
+  { space: '#170b14', nebula: '#4c1d3a', planet: '#ffb38a', px: 0.7, py: 0.62, pr: 70 },
+  { space: '#0a160f', nebula: '#1b4128', planet: '#d9ccf5', px: 0.3, py: 0.5, pr: 38 },
+  { space: '#130f08', nebula: '#4a3a1b', planet: '#a9d4f2', px: 0.82, py: 0.58, pr: 56 },
+]
+
+// The wave's patch of space
+function backdrop(ctx, W, sector) {
+  const glow = ctx.createRadialGradient(W * 0.3, HEIGHT * 0.35, 0, W * 0.3, HEIGHT * 0.35, HEIGHT * 0.6)
+  glow.addColorStop(0, sector.nebula)
+  glow.addColorStop(1, sector.space)
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, W, HEIGHT)
+  // The planet, dim enough to stay behind the aliens, lit from the left and half in shadow
+  const [x, y, r] = [W * sector.px, HEIGHT * sector.py, sector.pr]
+  ctx.save()
+  ctx.globalAlpha = 0.3
+  ctx.fillStyle = sector.planet
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.clip()
+  ctx.globalAlpha = 0.6
+  ctx.fillStyle = sector.space
+  ctx.beginPath()
+  ctx.arc(x + r * 0.35, y + r * 0.2, r * 0.95, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+}
 
 // The same scattered stars every time, across the widest screen (a narrow one shows the left half)
 const STARS = Array.from({ length: 100 }, (_, i) => {
@@ -53,10 +88,11 @@ function bitmap(ctx, rows, x, y, px, colour) {
   )
 }
 
-function draw(ctx, game, heads, time, looking) {
+// `wave`: which wave's patch of space, fading from one to the next
+function draw(ctx, game, heads, time, looking, wave) {
   const W = game.width // the screen's width: wider on a desktop
-  ctx.fillStyle = COLOURS.space
-  ctx.fillRect(0, 0, W, HEIGHT)
+  const sector = themeAt(SECTORS, wave).palette
+  backdrop(ctx, W, sector)
   for (const [x, y, size] of STARS) {
     if (x > W) continue
     ctx.globalAlpha = 0.35 + 0.35 * Math.sin(time * 1.5 + x)
@@ -126,7 +162,7 @@ function draw(ctx, game, heads, time, looking) {
   ctx.globalAlpha = 1
 
   // The score strip: score, wave, and a little cannon per life left
-  ctx.fillStyle = COLOURS.space
+  ctx.fillStyle = sector.space
   ctx.fillRect(0, 0, W, HUD)
   ctx.fillStyle = 'rgb(255 255 255 / 0.15)'
   ctx.fillRect(0, HUD - 2, W, 2)
@@ -218,6 +254,7 @@ export default function Invaders() {
     let last = performance.now()
     let animation
     let looking = 0 // the cannon's rider faces the way it last slid
+    let wave = 0 // the wave whose patch of space is showing (lib/themes.js), fading to the next
 
     function resize() {
       const ratio = devicePixelRatio || 1
@@ -244,7 +281,8 @@ export default function Invaders() {
         }
       }
       ctx.setTransform(el.width / game.current.width, 0, 0, el.height / HEIGHT, 0, 0)
-      draw(ctx, game.current, heads.current, now / 1000, looking)
+      wave = approach(wave, game.current.wave - 1, dt)
+      draw(ctx, game.current, heads.current, now / 1000, looking, wave)
       animation = requestAnimationFrame(tick)
     }
     animation = requestAnimationFrame(tick)
