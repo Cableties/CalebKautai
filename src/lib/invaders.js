@@ -1,5 +1,7 @@
+import { allSettingsGames, settingsGame } from './settings.js'
+
 // The rules of Invaders (pages/Invaders.jsx), kept free of the DOM so they can be unit tested.
-// The screen is a fixed WIDTH × HEIGHT box in its own units (y grows downwards); the page scales it
+// The screen is a WIDTH (wider on a desktop) × HEIGHT box in its own units (y grows downwards); the page scales it
 // to fit. A fleet of aliens marches side to side, dropping a row at each edge and speeding up as it
 // thins out; the player's cannon slides along the bottom, firing up at it from behind three bunkers.
 // Clear the fleet and a faster one comes, a little lower. Now and then a saucer flies over the top
@@ -22,17 +24,29 @@ const BUNKER = ['  #######  ', ' ######### ', '###########', '###########', '###
 const BUNKERS = { y: 488, xs: [70, 180, 290] }
 // Easy Mode (a secret cheat): a spare life, fewer bombs, and a slower march
 const EASY = { lives: 1, bombs: 1.4, march: 1.15 }
-// The fastest anyone could score, for the server's sanity check: a top-row alien with every shot,
-// plus every saucer
-export const POINTS_PER_SECOND = 160
+// Rapid fire: shots this much more often, and more of them up at once
+const RAPID = { cooldown: 0.18, max: 4 }
+// The fastest anyone could score, for the server's sanity check: a top-row alien with every shot
+// (at rapid fire), plus every saucer
+export const POINTS_PER_SECOND = 320
 
-const fleetLeft = () => (WIDTH - (FLEET.cols - 1) * FLEET.gapX) / 2
+export const SETTINGS = [
+  { id: 'nobunkers', name: 'No bunkers', note: 'Nowhere to hide.' },
+  { id: 'rapid', name: 'Rapid fire', note: 'Shots twice as fast, four up at once.' },
+]
+export const invadersGame = (settings = {}) => settingsGame('invaders', SETTINGS, settings)
+export const INVADERS_GAMES = allSettingsGames('invaders', SETTINGS)
+
+// A wider screen (a desktop) has more than twice the columns of aliens, and five bunkers
+const colsFor = (width) => (width > WIDTH ? 14 : FLEET.cols)
+const bunkerXs = (width) => (width > WIDTH ? [0, 1, 2, 3, 4].map((i) => ((i + 0.5) * width) / 5) : BUNKERS.xs)
+const fleetLeft = (width, cols) => (width - (cols - 1) * FLEET.gapX) / 2
 // Where an alien is (its middle)
 export const alienAt = (fleet, col, row) => [fleet.x + col * FLEET.gapX, fleet.y + row * FLEET.gapY]
 
-function bunkers() {
+function bunkers(width) {
   const blocks = []
-  for (const cx of BUNKERS.xs) {
+  for (const cx of bunkerXs(width)) {
     const left = cx - (BUNKER[0].length * BLOCK) / 2
     BUNKER.forEach((line, r) =>
       [...line].forEach((c, i) => c === '#' && blocks.push({ x: left + i * BLOCK, y: BUNKERS.y + r * BLOCK })),
@@ -41,27 +55,31 @@ function bunkers() {
   return blocks
 }
 
-function newFleet(wave) {
+function newFleet(wave, width) {
+  const cols = colsFor(width)
   return {
-    x: fleetLeft(),
+    cols,
+    x: fleetLeft(width, cols),
     y: FLEET.top + Math.min(60, (wave - 1) * 12),
     dir: 1,
     timer: 0,
     frame: 0,
-    alive: Array(FLEET.cols * FLEET.rows).fill(true),
+    alive: Array(cols * FLEET.rows).fill(true),
   }
 }
 
-export function start({ easy = false } = {}) {
+// `width`: the screen's width (wider on a desktop)
+export function start({ easy = false, nobunkers = false, rapid = false, width = WIDTH } = {}) {
   return {
-    x: WIDTH / 2,
+    width,
+    x: width / 2,
     lives: LIVES + (easy ? EASY.lives : 0),
     score: 0,
     wave: 1,
-    fleet: newFleet(1),
+    fleet: newFleet(1, width),
     bullets: [],
     bombs: [],
-    blocks: bunkers(),
+    blocks: nobunkers ? [] : bunkers(width),
     booms: [], // little explosions where something was hit: { x, y, age }
     saucer: null,
     saucerIn: SAUCER.every[0],
@@ -71,6 +89,7 @@ export function start({ easy = false } = {}) {
     shot: false, // fired this frame (for the sound)
     over: false,
     easy,
+    rapid,
   }
 }
 
@@ -101,11 +120,11 @@ export function step(state, dt, input = {}, random = Math.random) {
   let dx = input.target != null ? Math.max(-reach * 1.6, Math.min(reach * 1.6, input.target - s.x)) : 0
   if (input.left) dx -= reach
   if (input.right) dx += reach
-  s.x = Math.max(PLAYER.half + 4, Math.min(WIDTH - PLAYER.half - 4, s.x + dx))
+  s.x = Math.max(PLAYER.half + 4, Math.min(s.width - PLAYER.half - 4, s.x + dx))
   s.cooldown -= dt
-  if (input.fire && s.cooldown <= 0 && s.bullets.length < BULLET.max) {
+  if (input.fire && s.cooldown <= 0 && s.bullets.length < (s.rapid ? RAPID.max : BULLET.max)) {
     s.bullets.push({ x: s.x, y: PLAYER.y - 18 })
-    s.cooldown = BULLET.cooldown
+    s.cooldown = s.rapid ? RAPID.cooldown : BULLET.cooldown
     s.shot = true
   }
 
@@ -115,11 +134,11 @@ export function step(state, dt, input = {}, random = Math.random) {
   while (f.timer >= marchEvery(s)) {
     f.timer -= marchEvery(s)
     f.frame ^= 1
-    const cols = [...Array(FLEET.cols).keys()].filter((c) => [...Array(FLEET.rows).keys()].some((r) => f.alive[r * FLEET.cols + c]))
+    const cols = [...Array(f.cols).keys()].filter((c) => [...Array(FLEET.rows).keys()].some((r) => f.alive[r * f.cols + c]))
     const next = f.x + f.dir * FLEET.step
     const left = next + cols[0] * FLEET.gapX - ALIEN.width / 2
     const right = next + cols.at(-1) * FLEET.gapX + ALIEN.width / 2
-    if (left < 6 || right > WIDTH - 6) {
+    if (left < 6 || right > s.width - 6) {
       f.y += FLEET.drop
       f.dir = -f.dir
     } else f.x = next
@@ -130,10 +149,10 @@ export function step(state, dt, input = {}, random = Math.random) {
   if (s.bombIn <= 0) {
     const every = Math.max(BOMB.fastest, BOMB.every - 0.12 * (s.wave - 1)) * (s.easy ? EASY.bombs : 1)
     s.bombIn = every * (0.6 + 0.8 * random())
-    const cols = [...Array(FLEET.cols).keys()].filter((c) => [...Array(FLEET.rows).keys()].some((r) => f.alive[r * FLEET.cols + c]))
+    const cols = [...Array(f.cols).keys()].filter((c) => [...Array(FLEET.rows).keys()].some((r) => f.alive[r * f.cols + c]))
     if (cols.length) {
       const c = cols[Math.floor(random() * cols.length)]
-      const r = [...Array(FLEET.rows).keys()].reverse().find((r) => f.alive[r * FLEET.cols + c])
+      const r = [...Array(FLEET.rows).keys()].reverse().find((r) => f.alive[r * f.cols + c])
       const [ax, ay] = alienAt(f, c, r)
       s.bombs.push({ x: ax, y: ay + ALIEN.height / 2 })
     }
@@ -143,12 +162,12 @@ export function step(state, dt, input = {}, random = Math.random) {
   s.saucerIn -= dt
   if (!s.saucer && s.saucerIn <= 0) {
     const dir = random() < 0.5 ? 1 : -1
-    s.saucer = { x: dir > 0 ? -30 : WIDTH + 30, dir, points: SAUCER.points[Math.floor(random() * SAUCER.points.length)] }
+    s.saucer = { x: dir > 0 ? -30 : s.width + 30, dir, points: SAUCER.points[Math.floor(random() * SAUCER.points.length)] }
     s.saucerIn = SAUCER.every[0] + random() * (SAUCER.every[1] - SAUCER.every[0])
   }
   if (s.saucer) {
     s.saucer.x += s.saucer.dir * SAUCER.speed * dt
-    if (s.saucer.x < -40 || s.saucer.x > WIDTH + 40) s.saucer = null
+    if (s.saucer.x < -40 || s.saucer.x > s.width + 40) s.saucer = null
   }
 
   // Shots going up: into an alien, the saucer, a bunker, or off the top
@@ -158,10 +177,10 @@ export function step(state, dt, input = {}, random = Math.random) {
     if (chip(s, b.x, b.y)) return false
     for (let i = 0; i < f.alive.length; i++) {
       if (!f.alive[i]) continue
-      const [ax, ay] = alienAt(f, i % FLEET.cols, Math.floor(i / FLEET.cols))
+      const [ax, ay] = alienAt(f, i % f.cols, Math.floor(i / f.cols))
       if (Math.abs(b.x - ax) < ALIEN.width / 2 && Math.abs(b.y - ay) < ALIEN.height / 2) {
         f.alive[i] = false
-        s.score += POINTS[Math.floor(i / FLEET.cols)]
+        s.score += POINTS[Math.floor(i / f.cols)]
         s.booms.push({ x: ax, y: ay, age: 0 })
         return false
       }
@@ -195,7 +214,7 @@ export function step(state, dt, input = {}, random = Math.random) {
   // The fleet eats through the bunkers it reaches, and it's over if it reaches the cannon
   for (let i = 0; i < f.alive.length; i++) {
     if (!f.alive[i]) continue
-    const [ax, ay] = alienAt(f, i % FLEET.cols, Math.floor(i / FLEET.cols))
+    const [ax, ay] = alienAt(f, i % f.cols, Math.floor(i / f.cols))
     s.blocks = s.blocks.filter(
       (b) => !(Math.abs(b.x + BLOCK / 2 - ax) < ALIEN.width / 2 && Math.abs(b.y + BLOCK / 2 - ay) < ALIEN.height / 2),
     )
@@ -205,7 +224,7 @@ export function step(state, dt, input = {}, random = Math.random) {
   // Fleet cleared: the next wave
   if (f.alive.every((a) => !a)) {
     s.wave++
-    s.fleet = newFleet(s.wave)
+    s.fleet = newFleet(s.wave, s.width)
     s.bullets = []
     s.bombs = []
   }

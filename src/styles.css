@@ -3636,6 +3636,16 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 /* Snake and Invaders: a finger dragging on the screen steers, rather than scrolling the page */
+/* On a wide window the games get an arcade-shaped board (components/useWide.js): as big as fits the
+   window, with the high scores moved underneath to give it the page's whole width */
+.game-stage.wide {
+  aspect-ratio: 21 / 16;
+  width: calc((100dvh - 110px) * 21 / 16);
+  max-width: 100%;
+}
+.game-layout:has(.game-stage.wide) {
+  grid-template-columns: minmax(0, 1fr);
+}
 .swipe-stage {
   touch-action: none;
 }
@@ -3892,6 +3902,11 @@ a {
 .bonk-hole.missed .bonk-dust {
   animation: bonk-dust 0.3s ease-out;
 }
+/* Decoys: bonking the wrong head flashes the hole red */
+.bonk-hole.oops {
+  box-shadow: inset 0 0 0 4px #e8423f;
+  background-color: #f6c6c3;
+}
 @keyframes bonk-dust {
   from {
     opacity: 0.9;
@@ -3914,48 +3929,173 @@ a {
   border-radius: 17px;
 }
 /* Pinball: pick a table, each in its own colours */
-/* Game settings (Snake's walls, obstacles and portals): switches with a tick when on */
-.game-settings {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
+/* Game settings (components/GameSettings.jsx): a cog in the corner of the game, below its score
+   strip, opening a panel of switches over it */
+.game-cog {
+  position: absolute;
+  top: 54px;
+  right: 10px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  color: #fff;
+  background: rgb(46 42 69 / 0.85);
+  border: 2px solid rgb(255 255 255 / 0.6);
+  border-radius: 50%;
+  cursor: pointer;
 }
-.game-setting {
-  display: inline-flex;
-  align-items: center;
+.game-cog svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+.game-cog:focus-visible {
+  outline: 3px solid var(--blue-ink);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .game-cog:hover svg {
+    rotate: 45deg;
+    transition: rotate 0.3s ease-out;
+  }
+}
+/* How many are on */
+.game-cog-count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  font: 700 0.7rem/1 var(--body);
+  color: #2e2a45;
+  background: #fdeca0;
+  border-radius: 999px;
+}
+.game-settings-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 18px;
+  overflow: auto;
+  text-align: left;
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  backdrop-filter: blur(4px);
+  cursor: default;
+}
+.game-settings-panel h2 {
+  margin: 0;
+  font: 800 1.6rem/1 var(--display);
+}
+.game-settings-panel ul {
+  display: grid;
   gap: 8px;
-  min-height: 40px;
-  padding: 0 16px 0 12px;
-  font: 600 0.95rem/1 var(--body);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.game-settings-panel > .button {
+  align-self: center;
+  margin-top: auto;
+}
+.game-settings-boards {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+/* A switch: a tick box, the setting's name, and a line on what it does */
+.game-setting {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
   color: var(--ink);
   background: var(--paper);
   border: 2px solid var(--line);
-  border-radius: 999px;
+  border-radius: 14px;
   cursor: pointer;
 }
 .game-setting::before {
   content: '';
-  width: 16px;
-  height: 16px;
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: 0.8rem;
   border: 2px solid var(--ink-soft);
-  border-radius: 5px;
+  border-radius: 6px;
 }
 .game-setting[aria-checked='true'] {
   border-color: var(--ink);
 }
 .game-setting[aria-checked='true']::before {
   content: '✓';
-  display: grid;
-  place-items: center;
-  font-size: 0.75rem;
   color: var(--paper);
   background: var(--ink);
   border-color: var(--ink);
 }
-.game-setting:disabled {
-  opacity: 0.5;
-  cursor: default;
+.game-setting-name {
+  font: 700 0.95rem/1.2 var(--body);
+}
+.game-setting-note {
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--ink-soft);
+}
+/* Pause (components/Pause.jsx): in the cog's corner, while a game's being played */
+.game-pause {
+  position: absolute;
+  top: 54px;
+  right: 10px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  color: #fff;
+  background: rgb(46 42 69 / 0.6);
+  border: 2px solid rgb(255 255 255 / 0.5);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.game-pause svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+}
+.game-pause:focus-visible {
+  outline: 3px solid var(--blue-ink);
+  outline-offset: 2px;
+}
+.game-paused-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+/* Pinball has its score above the table, so the corner's clear */
+.pinball-stage .game-pause {
+  top: 10px;
+}
+/* Bonk's board has its score bar, not a canvas strip, along the top */
+.bonk .game-pause,
+.bonk .game-cog {
+  top: 58px;
+  right: 24px;
 }
 .pinball-tables {
   display: flex;

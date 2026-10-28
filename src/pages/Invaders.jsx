@@ -2,17 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HEADS } from '../lib/bounce.js'
 import { cheatOn, gameHead } from '../lib/gameHead.js'
-import { BLOCK, FLEET, HEIGHT, PLAYER, SAUCER, WIDTH, alienAt, start, step } from '../lib/invaders.js'
+import { BLOCK, HEIGHT, PLAYER, SAUCER, SETTINGS, WIDTH, alienAt, invadersGame, start, step } from '../lib/invaders.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
+import GameSettings, { useGameSettings } from '../components/GameSettings.jsx'
+import { PauseButton, Paused, usePause } from '../components/Pause.jsx'
 import SoundToggle from '../components/SoundToggle.jsx'
+import useWide, { WIDE_WIDTH } from '../components/useWide.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { feedback } from '../lib/feedback.js'
 
 // Invaders: pixel aliens march down on the head, riding a cannon along the bottom. The other head
 // flies over now and then in a saucer, for bonus points. The rules are in lib/invaders.js; this
 // draws them on a canvas and handles input: hold a finger down to slide and fire, or the arrow keys
-// and Space.
-const GAME = 'invaders'
+// and Space. Settings (no bunkers, rapid fire) are behind the cog, and each mix has its own scores.
 const LEFT_KEYS = ['ArrowLeft', 'a', 'A']
 const RIGHT_KEYS = ['ArrowRight', 'd', 'D']
 const FIRE_KEYS = [' ', 'ArrowUp', 'w', 'W']
@@ -36,10 +38,10 @@ const ROW_COLOURS = ['#f7b6d2', '#a9d4f2', '#a9d4f2', '#bfe8d6']
 const CANNON = ['......#......', '.....###.....', '.###########.', '#############', '#############', '#############']
 const COLOURS = { space: '#0d0c16', star: '#d9ccf5', cannon: '#7dffb2', bunker: '#7dffb2', shot: '#fff', bomb: '#ffe27a', hud: '#bfe8d6' }
 
-// The same scattered stars every time
-const STARS = Array.from({ length: 50 }, (_, i) => {
+// The same scattered stars every time, across the widest screen (a narrow one shows the left half)
+const STARS = Array.from({ length: 100 }, (_, i) => {
   const r = (n) => Math.abs(Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1
-  return [r(1) * WIDTH, HUD + r(2) * (HEIGHT - HUD), r(3) < 0.2 ? 2 : 1]
+  return [r(1) * WIDE_WIDTH, HUD + r(2) * (HEIGHT - HUD), r(3) < 0.2 ? 2 : 1]
 })
 
 function bitmap(ctx, rows, x, y, px, colour) {
@@ -52,9 +54,11 @@ function bitmap(ctx, rows, x, y, px, colour) {
 }
 
 function draw(ctx, game, heads, time, looking) {
+  const W = game.width // the screen's width: wider on a desktop
   ctx.fillStyle = COLOURS.space
-  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  ctx.fillRect(0, 0, W, HEIGHT)
   for (const [x, y, size] of STARS) {
+    if (x > W) continue
     ctx.globalAlpha = 0.35 + 0.35 * Math.sin(time * 1.5 + x)
     ctx.fillStyle = COLOURS.star
     ctx.fillRect(x, y, size, size)
@@ -69,8 +73,8 @@ function draw(ctx, game, heads, time, looking) {
   const f = game.fleet
   f.alive.forEach((alive, i) => {
     if (!alive) return
-    const row = Math.floor(i / FLEET.cols)
-    const [x, y] = alienAt(f, i % FLEET.cols, row)
+    const row = Math.floor(i / f.cols)
+    const [x, y] = alienAt(f, i % f.cols, row)
     bitmap(ctx, ROWS[row][f.frame], x, y, 2.5, ROW_COLOURS[row])
   })
 
@@ -123,17 +127,17 @@ function draw(ctx, game, heads, time, looking) {
 
   // The score strip: score, wave, and a little cannon per life left
   ctx.fillStyle = COLOURS.space
-  ctx.fillRect(0, 0, WIDTH, HUD)
+  ctx.fillRect(0, 0, W, HUD)
   ctx.fillStyle = 'rgb(255 255 255 / 0.15)'
-  ctx.fillRect(0, HUD - 2, WIDTH, 2)
+  ctx.fillRect(0, HUD - 2, W, 2)
   ctx.font = '700 16px ui-monospace, Menlo, Consolas, monospace'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = COLOURS.hud
   ctx.textAlign = 'left'
   ctx.fillText(`SCORE ${game.score}`, 12, HUD / 2)
   ctx.textAlign = 'center'
-  ctx.fillText(`WAVE ${game.wave}`, WIDTH / 2 + 10, HUD / 2)
-  for (let i = 0; i < game.lives; i++) bitmap(ctx, CANNON, WIDTH - 22 - i * 26, HUD / 2, 1.6, COLOURS.cannon)
+  ctx.fillText(`WAVE ${game.wave}`, W / 2 + 10, HUD / 2)
+  for (let i = 0; i < game.lives; i++) bitmap(ctx, CANNON, W - 22 - i * 26, HUD / 2, 1.6, COLOURS.cannon)
 }
 
 // What changed between one frame and the next, for the sounds (and buzzes)
@@ -155,17 +159,45 @@ export default function Invaders() {
   const heads = useRef({})
   const { player } = useCheats()
   const [phase, setPhase] = useState('ready') // ready | playing | over
+  // A wider board on a wide window (components/useWide.js), picked as each game is set up
+  const wide = useWide()
+  const wideRef = useRef(wide)
+  wideRef.current = wide
+  const [boardWide, setBoardWide] = useState(false)
   const [score, setScore] = useState(0)
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null)
+  const [settings, toggleSetting, settingsRef] = useGameSettings('invaders', SETTINGS)
+  const GAME = invadersGame(settings)
   const [best, record] = useBest(GAME)
   const { run, begin } = useRun(GAME)
   const phaseRef = useRef(phase)
   phaseRef.current = phase
+  const { pause, resume } = usePause(phaseRef, setPhase, {
+    // Let go of anything held, so it isn't still held on the way back
+    onPause: () => {
+      input.current = {}
+    },
+  })
+  // In refs, since the game loop and key handler are set up once
   const recordRef = useRef(record)
   recordRef.current = record
+  const beginRef = useRef(begin)
+  beginRef.current = begin
 
-  const fresh = () => start({ easy: cheatOn('easy') })
+  const fresh = () => {
+    setBoardWide(wideRef.current)
+    return start({ ...settingsRef.current, easy: cheatOn('easy'), width: wideRef.current ? WIDE_WIDTH : WIDTH })
+  }
+
+  // New settings (or the saved ones, once they load): ready to go with them, and their scores
+  useEffect(() => {
+    if (phaseRef.current === 'playing' || phaseRef.current === 'paused') return
+    game.current = fresh()
+    setScores(null)
+    setScore(0)
+    setPhase('ready')
+  }, [GAME, wide])
 
   useEffect(() => {
     const load = (who) => {
@@ -211,7 +243,7 @@ export default function Invaders() {
           setNewBest(!g.easy && recordRef.current(g.score))
         }
       }
-      ctx.setTransform(el.width / WIDTH, 0, 0, el.height / HEIGHT, 0, 0)
+      ctx.setTransform(el.width / game.current.width, 0, 0, el.height / HEIGHT, 0, 0)
       draw(ctx, game.current, heads.current, now / 1000, looking)
       animation = requestAnimationFrame(tick)
     }
@@ -228,15 +260,15 @@ export default function Invaders() {
     setScore(0)
     setNewBest(false)
     setPhase('playing')
-    begin()
+    beginRef.current()
   }
 
   // A finger (or the mouse) held down: the cannon slides under it and keeps firing
   function aim(e) {
     const box = stage.current.getBoundingClientRect()
-    const x = ((e.clientX - box.left) / box.width) * WIDTH
+    const x = ((e.clientX - box.left) / box.width) * game.current.width
     // Australia Mode has the page upside down, so the board's left is the screen's right
-    return document.documentElement.hasAttribute('data-cheat-australia') ? WIDTH - x : x
+    return document.documentElement.hasAttribute('data-cheat-australia') ? game.current.width - x : x
   }
   function down(e) {
     e.preventDefault()
@@ -283,7 +315,7 @@ export default function Invaders() {
 
       <div className="game-layout">
         <div
-          className="game-stage swipe-stage"
+          className={`game-stage swipe-stage${boardWide ? ' wide' : ''}`}
           ref={stage}
           onPointerDown={down}
           onPointerMove={move}
@@ -309,6 +341,9 @@ export default function Invaders() {
               </button>
             </div>
           )}
+          {phase === 'playing' && <PauseButton onPause={pause} />}
+          {phase === 'paused' && <Paused onResume={resume} />}
+          <GameSettings options={SETTINGS} settings={settings} onToggle={toggleSetting} hidden={phase === 'playing' || phase === 'paused'} />
         </div>
         <ScoreBoard game={GAME} scores={scores} />
       </div>

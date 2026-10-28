@@ -22,11 +22,62 @@ test("the games page lists the games, and the menu leads there", async ({
 	await expect(
 		page.getByRole("heading", { name: "Bonk", level: 1 }),
 	).toBeVisible();
-	for (const name of ["Snake", "Invaders", "Bricks"]) {
+	for (const name of ["Snake", "Invaders", "Bricks", "Bubbles"]) {
 		await page.getByRole("link", { name: "← All games" }).click();
 		await page.getByRole("link", { name: new RegExp(name) }).click();
 		await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
 	}
+});
+
+test.describe("Pausing", () => {
+	test("the pause button and P stop the game, and it carries on where it was", async ({
+		page,
+	}) => {
+		await page.goto("/games/snake");
+		await page.keyboard.press("ArrowUp");
+		await page.getByRole("button", { name: "Pause" }).click();
+		await expect(page.getByRole("heading", { name: "Paused" })).toBeVisible();
+		// Left alone it would hit the wall in about two seconds; paused, it doesn't
+		await page.waitForTimeout(3000);
+		await expect(page.getByRole("heading", { name: "Ouch!" })).toHaveCount(0);
+		// No settings mid-game
+		await expect(page.getByRole("button", { name: /^Settings/ })).toHaveCount(0);
+		await page.keyboard.press("p");
+		await expect(page.getByRole("heading", { name: "Paused" })).toBeHidden();
+		await page.keyboard.press("p");
+		await expect(page.getByRole("heading", { name: "Paused" })).toBeVisible();
+		await page.getByRole("button", { name: "Resume" }).click();
+		await expect(page.getByRole("heading", { name: "Ouch!" })).toBeVisible({
+			timeout: 5000,
+		});
+	});
+
+	test("switching away from the tab pauses it", async ({ page }) => {
+		await page.goto("/games/flappy-head");
+		await page.keyboard.press("Space");
+		await page.evaluate(() => {
+			Object.defineProperty(document, "hidden", { value: true, configurable: true });
+			document.dispatchEvent(new Event("visibilitychange"));
+		});
+		await expect(page.getByRole("heading", { name: "Paused" })).toBeVisible();
+	});
+
+	test("Bonk's clock stops while it's paused", async ({ page }) => {
+		await page.clock.install();
+		await page.goto("/games/bonk");
+		await page.getByRole("button", { name: "Start" }).click();
+		await page.clock.runFor(2000);
+		await page.getByRole("button", { name: "Pause" }).click();
+		const seconds = page.locator(".bonk-bar strong").nth(1);
+		const left = await seconds.innerText();
+		await page.clock.runFor(10_000);
+		await expect(seconds).toHaveText(left);
+		await expect(page.getByRole("button", { name: "Bonk the head!" })).toHaveCount(0);
+		await page.getByRole("button", { name: "Resume" }).click();
+		await page.clock.runFor(2000);
+		await expect(seconds).not.toHaveText(left);
+		await expect(page.getByRole("heading", { name: "Time!" })).toHaveCount(0);
+	});
 });
 
 test.describe("Snake", () => {
@@ -51,19 +102,33 @@ test.describe("Snake", () => {
 		await page.goto("/games/snake");
 		const board = page.getByRole("region", { name: "High scores" });
 		await expect(board).toContainText("No scores yet");
-		const portals = page.getByRole("switch", { name: "Portals" });
+		// Behind the cog in the corner of the game
+		await page.getByRole("button", { name: "Settings" }).click();
+		const portals = page.getByRole("switch", { name: /Portals/ });
 		await portals.click();
 		await expect(portals).toHaveAttribute("aria-checked", "true");
 		await expect(board).toContainText("POR");
+		await page.getByRole("button", { name: "Done" }).click();
+		await expect(portals).toBeHidden();
+		// Still waiting to start: changing settings didn't start a game
+		await expect(page.getByText("Swipe to start")).toBeVisible();
 		await page.reload();
-		await expect(page.getByRole("switch", { name: "Portals" })).toHaveAttribute(
-			"aria-checked",
-			"true",
-		);
+		await expect(page.getByRole("button", { name: "Settings (1 on)" })).toBeVisible();
 		await expect(board).toContainText("POR");
 		// Not while a game's going
 		await page.keyboard.press("ArrowUp");
-		await expect(page.getByRole("switch", { name: "Obstacles" })).toBeDisabled();
+		await expect(page.getByRole("button", { name: /^Settings/ })).toHaveCount(0);
+	});
+
+	test("arrow keys in the settings panel don't steer the game behind it", async ({
+		page,
+	}) => {
+		await page.goto("/games/snake");
+		await page.getByRole("button", { name: "Settings" }).click();
+		await page.keyboard.press("ArrowUp");
+		await page.keyboard.press("Escape");
+		await expect(page.getByRole("dialog", { name: "Settings" })).toBeHidden();
+		await expect(page.getByText("Swipe to start")).toBeVisible();
 	});
 
 	test("a swipe on the board starts it", async ({ page }) => {
@@ -94,6 +159,29 @@ test.describe("Bricks", () => {
 		await expect(page.getByRole("img", { name: /Bricks. Score: [1-9]/ })).toBeVisible({
 			timeout: 5000,
 		});
+	});
+});
+
+test.describe("Bubbles", () => {
+	test("Space starts it and fires, and a match pops", async ({ page }) => {
+		// Every bubble the same colour, so the first shot makes a match
+		await page.addInitScript(() => {
+			Math.random = () => 0;
+		});
+		await page.goto("/games/bubbles");
+		await page.keyboard.press(" ");
+		await expect(page.getByText("Tap to start")).toBeHidden();
+		await page.keyboard.press(" ");
+		await expect(page.getByRole("img", { name: /Bubbles. Score: [1-9]/ })).toBeVisible({
+			timeout: 5000,
+		});
+	});
+
+	test("a wide window gets a wider board, and a phone a tall one", async ({ page }) => {
+		await page.goto("/games/bubbles");
+		const { width, height } = await page.locator(".game-stage").boundingBox();
+		const wide = await page.evaluate(() => matchMedia("(min-width: 900px) and (min-aspect-ratio: 5/4)").matches);
+		expect(width / height > 1).toBe(wide);
 	});
 });
 
@@ -274,6 +362,26 @@ test.describe("Bonk", () => {
 		expect(api.scorePosts).toEqual([]);
 	});
 
+	test("with Decoys on, bonking the other head costs points (never below zero)", async ({
+		page,
+	}) => {
+		// Every head that pops up is a decoy
+		await page.addInitScript(() => {
+			Math.random = () => 0;
+		});
+		await page.clock.install();
+		await page.goto("/games/bonk");
+		await page.getByRole("button", { name: "Settings" }).click();
+		await page.getByRole("switch", { name: /Decoys/ }).click();
+		await page.getByRole("button", { name: "Done" }).click();
+		await page.getByRole("button", { name: "Start" }).click();
+		await page.clock.runFor(450);
+		const decoy = page.getByRole("button", { name: "Don't bonk Amber!" });
+		await decoy.click();
+		await expect(page.locator(".bonk-hole.oops")).toHaveCount(1);
+		await expect(page.locator(".bonk-bar")).toContainText("Score 0");
+	});
+
 	test("bonking heads scores, and the score goes on the board", async ({
 		page,
 		api,
@@ -379,6 +487,7 @@ test.describe("tap feedback", () => {
 		["/games/snake", ".game-stage"],
 		["/games/invaders", ".game-stage"],
 		["/games/bricks", ".game-stage"],
+		["/games/bubbles", ".game-stage"],
 	]) {
 		test(`${path}: no blue flash on a tap`, async ({ page, browserName }) => {
 			// Only Chromium's test build reports the tap highlight

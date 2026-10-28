@@ -1,3 +1,5 @@
+import { allSettingsGames, settingsGame } from './settings.js'
+
 // The rules of Bonk (pages/Bonk.jsx): whack-a-mole with Caleb's head, kept free of the DOM so they
 // can be unit tested. One head at a time pops out of one of HOLES holes, and stays up for less
 // time as the round goes on.
@@ -7,6 +9,17 @@ export const UP_MS = { start: 1100, end: 520 } // how long a head stays up, at t
 export const GAP_MS = 180 // between one head going down and the next coming up
 // The most anyone could score: every head bonked the moment it shows. The server checks against it.
 export const MAX_SCORE = Math.ceil(ROUND_MS / (UP_MS.end / 3 + GAP_MS))
+
+export const SETTINGS = [
+  { id: 'decoys', name: 'Decoys', note: 'Someone else pops up too. Bonk them and lose two points.' },
+  { id: 'frenzy', name: 'Frenzy', note: 'Two heads up at once.' },
+]
+export const bonkGame = (settings = {}) => settingsGame('bonk', SETTINGS, settings)
+export const BONK_GAMES = allSettingsGames('bonk', SETTINGS)
+// Decoys: how often the head that pops up is the other one, and what bonking it costs
+export const DECOY = { chance: 0.3, penalty: 2 }
+// Frenzy: this many heads popping up and down at once, each on its own
+export const lanesFor = (settings = {}) => (settings.frenzy ? 2 : 1)
 
 // Easy Mode (a secret cheat) keeps each head up this much longer
 export const EASY_UP = 1.3
@@ -20,4 +33,10 @@ export function upTime(elapsed, easy = false) {
 export function nextHole(previous, random = Math.random) {
   const pick = Math.floor(random() * (HOLES - 1))
   return previous == null ? Math.floor(random() * HOLES) : pick >= previous ? pick + 1 : pick
+}
+
+// The same, staying out of any holes another head is up in (Frenzy)
+export function freeHole(taken, previous, random = Math.random) {
+  const free = [...Array(HOLES).keys()].filter((h) => h !== previous && !taken.includes(h))
+  return free[Math.floor(random() * free.length)]
 }

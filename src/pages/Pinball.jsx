@@ -23,6 +23,7 @@ import {
 	useRun,
 } from "../components/Scores.jsx";
 import SoundToggle from "../components/SoundToggle.jsx";
+import { PauseButton, Paused, usePause } from "../components/Pause.jsx";
 import { feedback } from "../lib/feedback.js";
 import { useCheats } from "../components/Cheats.jsx";
 
@@ -318,13 +319,20 @@ export default function Pinball() {
 	const pointers = useRef(new Map()); // pointer id → which flipper it holds
 	const fresh = { score: 0, balls: BALLS, multiplier: 1, inLane: true };
 	const [hud, setHud] = useState(fresh);
-	const [phase, setPhase] = useState("ready"); // ready | playing | over
+	const [phase, setPhase] = useState("ready"); // ready | playing | paused | over
 	const [newBest, setNewBest] = useState(false);
 	const [scores, setScores] = useState(null);
 	const [best, record] = useBest(GAME);
 	const { run, begin } = useRun(GAME);
 	const phaseRef = useRef(phase);
 	phaseRef.current = phase;
+	const { pause, resume } = usePause(phaseRef, setPhase, {
+		// Let go of the flippers, so they aren't still up on the way back
+		onPause: () => {
+			held.current = {};
+			pointers.current.clear();
+		},
+	});
 	const hudRef = useRef(hud);
 	hudRef.current = hud;
 	const recordRef = useRef(record);
@@ -431,7 +439,7 @@ export default function Pinball() {
 	}
 	function fire() {
 		if (phaseRef.current === "ready") play();
-		if (phaseRef.current === "over") return;
+		if (phaseRef.current === "over" || phaseRef.current === "paused") return;
 		if (game.current.inLane) feedback("launch");
 		game.current = launch(game.current);
 	}
@@ -443,7 +451,7 @@ export default function Pinball() {
 
 	// Each finger holds the flipper on its side of the table; a tap also launches a waiting ball
 	function down(e) {
-		if (phaseRef.current === "over") return;
+		if (phaseRef.current === "over" || phaseRef.current === "paused") return;
 		e.preventDefault();
 		const box = stage.current.getBoundingClientRect();
 		const side = e.clientX - box.left < box.width / 2 ? "left" : "right";
@@ -545,7 +553,7 @@ export default function Pinball() {
 							role="img"
 							aria-label={`${table.name} pinball table. Score: ${hud.score}`}
 						/>
-						{phase !== "over" && hud.inLane && (
+						{(phase === "ready" || phase === "playing") && hud.inLane && (
 							<div className="game-overlay game-overlay-hint">
 								<p>
 									{phase === "ready"
@@ -554,6 +562,8 @@ export default function Pinball() {
 								</p>
 							</div>
 						)}
+						{phase === "playing" && <PauseButton onPause={pause} />}
+						{phase === "paused" && <Paused onResume={resume} />}
 						{phase === "over" && (
 							<div
 								className="game-overlay"

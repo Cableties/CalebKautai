@@ -2,15 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HEADS } from '../lib/bounce.js'
 import { cheatOn, gameHead } from '../lib/gameHead.js'
-import { GROUND, HEAD_X, HEIGHT, PIPE_WIDTH, RADIUS, SPEED, WIDTH, facing, flap, start, step } from '../lib/flappy.js'
+import { GROUND, HEAD_X, HEIGHT, PIPE_WIDTH, RADIUS, SETTINGS, SPEED, WIDTH, facing, flap, flappyGame, start, step } from '../lib/flappy.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
+import GameSettings, { useGameSettings } from '../components/GameSettings.jsx'
+import { PauseButton, Paused, usePause } from '../components/Pause.jsx'
 import SoundToggle from '../components/SoundToggle.jsx'
+import useWide, { WIDE_WIDTH } from '../components/useWide.js'
 import { feedback } from '../lib/feedback.js'
 import { useCheats } from '../components/Cheats.jsx'
 
 // Flappy Head: the bouncing head's pixel-art sprites, flapping through pastel pipes. The rules are
-// in lib/flappy.js; this draws them on a canvas and handles input.
-const GAME = 'flappy-head'
+// in lib/flappy.js; this draws them on a canvas and handles input. Settings (moving pipes, moon
+// gravity) are behind the cog, and each mix has its own high scores.
 const COLOURS = {
   skyTop: '#cfe6f7',
   skyBottom: '#fbeaf2',
@@ -36,16 +39,17 @@ const CLOUDS = [
 ]
 
 function draw(ctx, game, head, looks, distance, puffs, time, scroll) {
+  const W = game.width // the world's width: wider on a desktop
   const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
   sky.addColorStop(0, COLOURS.skyTop)
   sky.addColorStop(1, COLOURS.skyBottom)
   ctx.fillStyle = sky
-  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  ctx.fillRect(0, 0, W, HEIGHT)
 
   // Clouds drift slower than the pipes, for a bit of depth
   ctx.fillStyle = COLOURS.cloud
   for (const [x, y, r] of CLOUDS) {
-    const cx = ((((x - distance * 0.2) % (WIDTH + 80)) + WIDTH + 80) % (WIDTH + 80)) - 40
+    const cx = ((((x - distance * 0.2) % (W + 80)) + W + 80) % (W + 80)) - 40
     for (const [dx, dy, s] of [[0, 0, 1], [r * 0.9, 4, 0.75], [-r * 0.9, 6, 0.7]]) {
       ctx.beginPath()
       ctx.arc(cx + dx, y + dy, r * s, 0, Math.PI * 2)
@@ -56,7 +60,8 @@ function draw(ctx, game, head, looks, distance, puffs, time, scroll) {
   ctx.lineWidth = 3
   ctx.strokeStyle = COLOURS.outline
   for (const p of game.pipes) {
-    ctx.fillStyle = COLOURS.pipes[Math.abs(Math.round(p.gapY)) % COLOURS.pipes.length]
+    // Its colour from where its opening started, so a moving pipe keeps the same one as it drifts
+    ctx.fillStyle = COLOURS.pipes[Math.abs(Math.round(p.baseY ?? p.gapY)) % COLOURS.pipes.length]
     const topEnd = p.gapY - p.gap / 2
     const bottomStart = p.gapY + p.gap / 2
     for (const [y, h, lipY] of [[-10, topEnd + 10, topEnd - 18], [bottomStart, HEIGHT - GROUND - bottomStart + 10, bottomStart]]) {
@@ -73,9 +78,9 @@ function draw(ctx, game, head, looks, distance, puffs, time, scroll) {
   }
 
   ctx.fillStyle = COLOURS.ground
-  ctx.fillRect(0, HEIGHT - GROUND, WIDTH, GROUND)
+  ctx.fillRect(0, HEIGHT - GROUND, W, GROUND)
   ctx.fillStyle = COLOURS.groundStripe
-  for (let x = -(distance % 32); x < WIDTH; x += 32) {
+  for (let x = -(distance % 32); x < W; x += 32) {
     ctx.beginPath()
     ctx.moveTo(x, HEIGHT - GROUND + 10)
     ctx.lineTo(x + 16, HEIGHT - GROUND + 10)
@@ -85,7 +90,7 @@ function draw(ctx, game, head, looks, distance, puffs, time, scroll) {
   }
   ctx.beginPath()
   ctx.moveTo(0, HEIGHT - GROUND)
-  ctx.lineTo(WIDTH, HEIGHT - GROUND)
+  ctx.lineTo(W, HEIGHT - GROUND)
   ctx.stroke()
 
   // Feathers from recent flaps, fading as they fall away behind
@@ -120,9 +125,9 @@ function draw(ctx, game, head, looks, distance, puffs, time, scroll) {
   ctx.textAlign = 'center'
   ctx.lineWidth = 8
   ctx.lineJoin = 'round'
-  ctx.strokeText(String(game.score), WIDTH / 2, 84)
+  ctx.strokeText(String(game.score), W / 2, 84)
   ctx.fillStyle = '#fff'
-  ctx.fillText(String(game.score), WIDTH / 2, 84)
+  ctx.fillText(String(game.score), W / 2, 84)
 }
 
 export default function FlappyHead() {
@@ -133,18 +138,48 @@ export default function FlappyHead() {
   const looks = useRef(null) // the cheats' effects on it (lib/gameHead.js)
   const { player } = useCheats()
   const [phase, setPhase] = useState('ready') // ready | playing | over
+  // A wider board on a wide window (components/useWide.js), picked as each game is set up
+  const wide = useWide()
+  const wideRef = useRef(wide)
+  wideRef.current = wide
+  const [boardWide, setBoardWide] = useState(false)
   const [score, setScore] = useState(0)
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null) // the board, refreshed after saving
+  const [settings, toggleSetting, settingsRef] = useGameSettings('flappy-head', SETTINGS)
+  const GAME = flappyGame(settings)
   const [best, record] = useBest(GAME)
   const { run, begin } = useRun(GAME)
   const phaseRef = useRef(phase)
   phaseRef.current = phase
+  const { pause, resume } = usePause(phaseRef, setPhase)
+  // In refs, since the game loop and key handler are set up once
+  const recordRef = useRef(record)
+  recordRef.current = record
+  const beginRef = useRef(begin)
+  beginRef.current = begin
   const puffs = useRef([])
   const distance = useRef(0)
   const frameTime = useRef(0) // the animation's clock, in seconds, so puffs age in step with it
 
-  const fresh = () => start({ radius: RADIUS * (cheatOn('bighead') ? 1.6 : 1), easy: cheatOn('easy') })
+  const fresh = () => {
+    setBoardWide(wideRef.current)
+    return start({
+      ...settingsRef.current,
+      radius: RADIUS * (cheatOn('bighead') ? 1.6 : 1),
+      easy: cheatOn('easy'),
+      width: wideRef.current ? WIDE_WIDTH : WIDTH,
+    })
+  }
+
+  // New settings (or the saved ones, once they load): ready to go with them, and their scores
+  useEffect(() => {
+    if (phaseRef.current === 'playing' || phaseRef.current === 'paused') return
+    game.current = fresh()
+    setScores(null)
+    setScore(0)
+    setPhase('ready')
+  }, [GAME, wide])
 
   useEffect(() => {
     const sheet = new Image()
@@ -184,14 +219,14 @@ export default function FlappyHead() {
         if (game.current.dead) {
           feedback('splat')
           setPhase('over')
-          setNewBest(!game.current.easy && record(game.current.score))
+          setNewBest(!game.current.easy && recordRef.current(game.current.score))
         }
       } else if (phaseRef.current === 'ready') {
         // Bob gently while waiting to start
         game.current = { ...game.current, y: HEIGHT * 0.42 + Math.sin(now / 300) * 8, vy: Math.cos(now / 300) * -60 }
         distance.current += SPEED * dt * 0.5
       }
-      ctx.setTransform(el.width / WIDTH, 0, 0, el.height / HEIGHT, 0, 0)
+      ctx.setTransform(el.width / game.current.width, 0, 0, el.height / HEIGHT, 0, 0)
       frameTime.current = now / 1000
       puffs.current = puffs.current.filter((p) => frameTime.current - p.time < PUFF_SECONDS)
       const scroll = phaseRef.current === 'playing' && !game.current.dead ? SPEED : phaseRef.current === 'ready' ? SPEED * 0.5 : 0
@@ -220,7 +255,7 @@ export default function FlappyHead() {
     setScore(0)
     setNewBest(false)
     setPhase('playing')
-    begin()
+    beginRef.current()
   }
   function press() {
     if (phaseRef.current === 'playing') game.current = flapNow(game.current)
@@ -250,7 +285,7 @@ export default function FlappyHead() {
       <p className="lede">Tap, click or press Space to flap. Don't touch the pipes.</p>
 
       <div className="game-layout">
-        <div className="game-stage" ref={stage} onPointerDown={(e) => (e.preventDefault(), press())}>
+        <div className={`game-stage${boardWide ? ' wide' : ''}`} ref={stage} onPointerDown={(e) => (e.preventDefault(), press())}>
           <canvas ref={canvas} className="game-canvas" role="img" aria-label={`Flappy Head. Score: ${score}`} />
           {phase === 'ready' && (
             <div className="game-overlay game-overlay-hint">
@@ -270,6 +305,9 @@ export default function FlappyHead() {
               </button>
             </div>
           )}
+          {phase === 'playing' && <PauseButton onPause={pause} />}
+          {phase === 'paused' && <Paused onResume={resume} />}
+          <GameSettings options={SETTINGS} settings={settings} onToggle={toggleSetting} hidden={phase === 'playing' || phase === 'paused'} />
         </div>
         <ScoreBoard game={GAME} scores={scores} />
       </div>

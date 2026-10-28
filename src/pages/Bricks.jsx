@@ -2,16 +2,19 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HEADS } from '../lib/bounce.js'
 import { cheatOn, gameHead } from '../lib/gameHead.js'
-import { BALL, BRICK, HEIGHT, PADDLE, WIDTH, launch, start, step } from '../lib/bricks.js'
+import { BALL, BRICK, HEIGHT, PADDLE, SAFETY_Y, SETTINGS, WIDTH, bricksGame, launch, paddleWidth, start, step } from '../lib/bricks.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
+import GameSettings, { useGameSettings } from '../components/GameSettings.jsx'
+import { PauseButton, Paused, usePause } from '../components/Pause.jsx'
 import SoundToggle from '../components/SoundToggle.jsx'
+import useWide, { WIDE_WIDTH } from '../components/useWide.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { feedback } from '../lib/feedback.js'
 
 // Bricks: the head is the ball, knocking out rows of pastel bricks off a paddle. The rules are in
 // lib/bricks.js; this draws them on a canvas and handles input: drag a finger to slide the paddle
-// and tap to launch, or the arrow keys and Space.
-const GAME = 'bricks'
+// and tap to launch, or the arrow keys and Space. Power-up bricks glow, and show what they do.
+// Settings are behind the cog, and each mix has its own high scores.
 const LEFT_KEYS = ['ArrowLeft', 'a', 'A']
 const RIGHT_KEYS = ['ArrowRight', 'd', 'D']
 const LAUNCH_KEYS = [' ', 'ArrowUp', 'w', 'W', 'Enter']
@@ -23,7 +26,13 @@ const COLOURS = {
   outline: '#2e2a45',
   paddle: '#e0559a',
   strip: '#2e2a45',
+  power: '#fff6c2',
+  safety: '#7fe7ff',
+  plough: '#ff8a3d',
 }
+// What's on a power-up brick, and the name of each one that's running, under the paddle
+const POWER_ICONS = { multi: '3×', safety: '▁▁', plough: '»»', wide: '↔', slow: '◔', life: '♥' }
+const TIMER_NAMES = { safety: 'Safety', plough: 'Plough', wide: 'Wide', slow: 'Slow-mo' }
 // A colour some way towards the outline's ink, for the tough bricks
 function darker(hex, amount) {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
@@ -33,11 +42,13 @@ function darker(hex, amount) {
 }
 
 function draw(ctx, game, head, looks, time) {
+  const W = game.width // the screen's width: wider on a desktop
+  const glow = 0.5 + 0.5 * Math.sin(time * 6)
   const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
   sky.addColorStop(0, COLOURS.skyTop)
   sky.addColorStop(1, COLOURS.skyBottom)
   ctx.fillStyle = sky
-  ctx.fillRect(0, 0, WIDTH, HEIGHT)
+  ctx.fillRect(0, 0, W, HEIGHT)
 
   // Bricks: a tough one is darker, and shows a crack once it's been hit
   ctx.lineWidth = 2.5
@@ -51,6 +62,23 @@ function draw(ctx, game, head, looks, time) {
     ctx.stroke()
     ctx.fillStyle = 'rgb(255 255 255 / 0.45)'
     ctx.fillRect(b.x + 5, b.y + 4, BRICK.width - 18, 3)
+    // A power-up: a pale brick with a glowing edge and its symbol
+    if (b.power) {
+      ctx.save()
+      ctx.shadowColor = '#ffe27a'
+      ctx.shadowBlur = 6 + glow * 10
+      ctx.fillStyle = COLOURS.power
+      ctx.beginPath()
+      ctx.roundRect(b.x, b.y, BRICK.width, BRICK.height, 5)
+      ctx.fill()
+      ctx.restore()
+      ctx.stroke()
+      ctx.font = '800 13px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = COLOURS.outline
+      ctx.fillText(POWER_ICONS[b.power], b.x + BRICK.width / 2, b.y + BRICK.height / 2 + 1)
+    }
     if (b.tough && b.hits === 1) {
       ctx.beginPath()
       ctx.moveTo(b.x + 12, b.y + 3)
@@ -73,8 +101,18 @@ function draw(ctx, game, head, looks, time) {
   }
   ctx.globalAlpha = 1
 
+  // The safety bar, flickering as it runs out
+  if (game.timers.safety > 0 && (game.timers.safety > 2 || Math.sin(time * 20) > 0)) {
+    ctx.save()
+    ctx.shadowColor = COLOURS.safety
+    ctx.shadowBlur = 12
+    ctx.fillStyle = COLOURS.safety
+    ctx.fillRect(4, SAFETY_Y, W - 8, 4)
+    ctx.restore()
+  }
+
   // The paddle
-  const width = PADDLE.width * (game.easy ? 1.3 : 1)
+  const width = paddleWidth(game)
   ctx.fillStyle = COLOURS.paddle
   ctx.strokeStyle = COLOURS.outline
   ctx.lineWidth = 3
@@ -83,21 +121,52 @@ function draw(ctx, game, head, looks, time) {
   ctx.fill()
   ctx.stroke()
 
-  // The ball: the head, facing the way it's going
-  if (!game.over) {
-    const { x, y, vx, vy } = game.ball
-    looks.draw(ctx, head, {
+  // The balls: the head, facing the way it's going (on fire while it's a plough ball). Each has
+  // its own copy of the cheats' effects, so Head Trail follows each one.
+  game.balls.forEach(({ x, y, vx, vy }, i) => {
+    if (game.timers.plough > 0) {
+      ctx.fillStyle = COLOURS.plough
+      ctx.globalAlpha = 0.35 + glow * 0.3
+      ctx.beginPath()
+      ctx.arc(x, y, BALL * 1.8, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.globalAlpha = 1
+    }
+    looks[i] ??= gameHead()
+    looks[i].draw(ctx, head, {
       x,
       y,
       size: BALL * 2.6,
       facing: game.stuck ? -90 : (Math.atan2(vy, vx) * 180) / Math.PI,
       time,
     })
+  })
+
+  // The names of power-ups just broken, floating up
+  ctx.font = '800 16px system-ui, sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.lineWidth = 4
+  for (const l of game.labels) {
+    ctx.globalAlpha = Math.min(1, 2 * (1.2 - l.age))
+    ctx.strokeStyle = COLOURS.outline
+    ctx.strokeText(l.text, Math.min(Math.max(l.x, 60), W - 60), l.y - l.age * 40)
+    ctx.fillStyle = '#ffe27a'
+    ctx.fillText(l.text, Math.min(Math.max(l.x, 60), W - 60), l.y - l.age * 40)
+  }
+  ctx.globalAlpha = 1
+
+  // The power-ups still running, with their seconds left, under the paddle
+  const running = Object.entries(game.timers).filter(([, t]) => t > 0)
+  if (running.length) {
+    ctx.font = '700 12px system-ui, sans-serif'
+    ctx.fillStyle = COLOURS.outline
+    ctx.fillText(running.map(([k, t]) => `${TIMER_NAMES[k]} ${Math.ceil(t)}`).join('  ·  '), W / 2, PADDLE.y + 36)
   }
 
   // The score strip: score, level, and a dot per ball left
   ctx.fillStyle = COLOURS.strip
-  ctx.fillRect(0, 0, WIDTH, HUD)
+  ctx.fillRect(0, 0, W, HUD)
   ctx.font = '800 20px system-ui, sans-serif'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = '#fff'
@@ -105,11 +174,11 @@ function draw(ctx, game, head, looks, time) {
   ctx.fillText(String(game.score), 14, HUD / 2 + 1)
   ctx.textAlign = 'center'
   ctx.font = '700 15px system-ui, sans-serif'
-  ctx.fillText(`Level ${game.level}`, WIDTH / 2, HUD / 2 + 1)
+  ctx.fillText(`Level ${game.level}`, W / 2, HUD / 2 + 1)
   ctx.fillStyle = COLOURS.paddle
   for (let i = 0; i < game.lives; i++) {
     ctx.beginPath()
-    ctx.arc(WIDTH - 18 - i * 18, HUD / 2, 6, 0, Math.PI * 2)
+    ctx.arc(W - 18 - i * 18, HUD / 2, 6, 0, Math.PI * 2)
     ctx.fill()
   }
 }
@@ -118,6 +187,7 @@ function draw(ctx, game, head, looks, time) {
 function effects(g) {
   if (g.lost) feedback('drain')
   else if (g.cleared) feedback('wave')
+  else if (g.powered) feedback('bonus')
   else if (g.hit) feedback('rollover')
   if (g.bounced) feedback('kicker')
 }
@@ -131,17 +201,45 @@ export default function Bricks() {
   const looks = useRef(null)
   const { player } = useCheats()
   const [phase, setPhase] = useState('ready') // ready | playing | over
+  // A wider board on a wide window (components/useWide.js), picked as each game is set up
+  const wide = useWide()
+  const wideRef = useRef(wide)
+  wideRef.current = wide
+  const [boardWide, setBoardWide] = useState(false)
   const [score, setScore] = useState(0)
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null)
+  const [settings, toggleSetting, settingsRef] = useGameSettings('bricks', SETTINGS)
+  const GAME = bricksGame(settings)
   const [best, record] = useBest(GAME)
   const { run, begin } = useRun(GAME)
   const phaseRef = useRef(phase)
   phaseRef.current = phase
+  const { pause, resume } = usePause(phaseRef, setPhase, {
+    // Let go of anything held, so it isn't still held on the way back
+    onPause: () => {
+      input.current = {}
+    },
+  })
+  // In refs, since the game loop and key handler are set up once
   const recordRef = useRef(record)
   recordRef.current = record
+  const beginRef = useRef(begin)
+  beginRef.current = begin
 
-  const fresh = () => start({ easy: cheatOn('easy') })
+  const fresh = () => {
+    setBoardWide(wideRef.current)
+    return start({ ...settingsRef.current, easy: cheatOn('easy'), width: wideRef.current ? WIDE_WIDTH : WIDTH })
+  }
+
+  // New settings (or the saved ones, once they load): a fresh game with them, and their scores
+  useEffect(() => {
+    if (phaseRef.current === 'playing' || phaseRef.current === 'paused') return
+    game.current = fresh()
+    setScores(null)
+    setScore(0)
+    setPhase('ready')
+  }, [GAME, wide])
 
   useEffect(() => {
     const sheet = new Image()
@@ -150,7 +248,7 @@ export default function Bricks() {
   }, [player])
 
   useEffect(() => {
-    looks.current = gameHead()
+    looks.current = []
     game.current = fresh()
     const el = canvas.current
     const ctx = el.getContext('2d')
@@ -169,7 +267,8 @@ export default function Bricks() {
     function tick(now) {
       const dt = Math.min((now - last) / 1000, 1 / 30)
       last = now
-      if (phaseRef.current !== 'over') {
+      // Waiting to start, the paddle still moves (the ball sitting on it); paused, nothing does
+      if (phaseRef.current === 'playing' || phaseRef.current === 'ready') {
         const before = game.current
         game.current = step(before, dt, input.current)
         const g = game.current
@@ -180,7 +279,7 @@ export default function Bricks() {
           setNewBest(!g.easy && recordRef.current(g.score))
         }
       }
-      ctx.setTransform(el.width / WIDTH, 0, 0, el.height / HEIGHT, 0, 0)
+      ctx.setTransform(el.width / game.current.width, 0, 0, el.height / HEIGHT, 0, 0)
       draw(ctx, game.current, head.current, looks.current, now / 1000)
       animation = requestAnimationFrame(tick)
     }
@@ -197,11 +296,11 @@ export default function Bricks() {
     setScore(0)
     setNewBest(false)
     setPhase('playing')
-    begin()
+    beginRef.current()
   }
   // Launch the ball off the paddle (starting the game first, if it's waiting)
   function fire() {
-    if (phaseRef.current === 'over') return
+    if (phaseRef.current === 'over' || phaseRef.current === 'paused') return
     if (phaseRef.current === 'ready') play()
     if (game.current.stuck) {
       game.current = launch(game.current)
@@ -212,9 +311,9 @@ export default function Bricks() {
   // A finger (or the mouse) on the screen: the paddle slides under it, and a tap launches
   function aim(e) {
     const box = stage.current.getBoundingClientRect()
-    const x = ((e.clientX - box.left) / box.width) * WIDTH
+    const x = ((e.clientX - box.left) / box.width) * game.current.width
     // Australia Mode has the page upside down, so the board's left is the screen's right
-    return document.documentElement.hasAttribute('data-cheat-australia') ? WIDTH - x : x
+    return document.documentElement.hasAttribute('data-cheat-australia') ? game.current.width - x : x
   }
   function down(e) {
     e.preventDefault()
@@ -264,11 +363,12 @@ export default function Bricks() {
       <h1 className="page-title">Bricks</h1>
       <p className="lede">
         Slide the paddle with your finger or the arrow keys, and tap or press Space to launch. Knock out every brick.
+        The glowing ones are power-ups.
       </p>
 
       <div className="game-layout">
         <div
-          className="game-stage swipe-stage"
+          className={`game-stage swipe-stage${boardWide ? ' wide' : ''}`}
           ref={stage}
           onPointerDown={down}
           onPointerMove={move}
@@ -294,6 +394,9 @@ export default function Bricks() {
               </button>
             </div>
           )}
+          {phase === 'playing' && <PauseButton onPause={pause} />}
+          {phase === 'paused' && <Paused onResume={resume} />}
+          <GameSettings options={SETTINGS} settings={settings} onToggle={toggleSetting} hidden={phase === 'playing' || phase === 'paused'} />
         </div>
         <ScoreBoard game={GAME} scores={scores} />
       </div>

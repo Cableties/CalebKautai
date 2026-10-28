@@ -147,3 +147,10 @@ test('scores: the board reads Upstash member/score pairs', () => {
     { initials: 'MEL', score: 7 },
   ])
 })
+
+test("scores: every mix of a game's settings has a board, and Bonk Frenzy can go twice as high", () => {
+  for (const game of ['flappy-head-moving-moon', 'bonk-decoys', 'snake-wrap-obstacles-portals', 'invaders-rapid', 'bricks-nopowers-small']) {
+    assert.ok(GAMES[game], game)
+  }
+  assert.equal(GAMES['bonk-frenzy'].max, GAMES.bonk.max * 2)
+})

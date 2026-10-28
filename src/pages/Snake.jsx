@@ -2,21 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HEADS } from '../lib/bounce.js'
 import { cheatOn, gameHead } from '../lib/gameHead.js'
-import { COLS, ROWS, facing, snakeGame, start, step, turn } from '../lib/snake.js'
+import { COLS, ROWS, SETTINGS, WIDE_COLS, facing, snakeGame, start, step, tickFor, turn } from '../lib/snake.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
+import GameSettings, { useGameSettings } from '../components/GameSettings.jsx'
+import { PauseButton, Paused, usePause } from '../components/Pause.jsx'
 import SoundToggle from '../components/SoundToggle.jsx'
+import useWide from '../components/useWide.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { feedback } from '../lib/feedback.js'
 
-// Snake: the head leads a pastel tail round the board, eating pixel hearts. The rules are in
+// Snake: the head leads a pastel tail round the board, eating pixel fruit. The rules are in
 // lib/snake.js; this draws them on a canvas and handles input: swipe, or the arrow keys / WASD.
-// Settings (wrap-around walls, obstacles, portals) are remembered, and each mix has its own board.
-const SETTINGS_KEY = 'snake-settings'
-const SETTING_NAMES = [
-  { id: 'wrap', name: 'Wrap-around walls' },
-  { id: 'obstacles', name: 'Obstacles' },
-  { id: 'portals', name: 'Portals' },
-]
+// The snake glides between cells rather than jumping: each segment is drawn partway from where it
+// was to where it's going, as far as the next move has come. Settings (wrap-around walls,
+// obstacles, portals) are behind the cog, and each mix has its own high scores.
 const WIDTH = 360
 const HEIGHT = 640
 const CELL = WIDTH / COLS
@@ -34,36 +33,84 @@ const KEYS = {
 }
 const COLOURS = {
   board: ['#dff3e8', '#d1ecdd'],
-  body: ['#f7b6d2', '#f0a2c4'],
+  body: '#f7b6d2',
+  shine: '#fcd9e8',
   outline: '#2e2a45',
   strip: '#2e2a45',
   rock: ['#8d919b', '#b9bcc4'],
   portals: ['#3fb8e0', '#f2a541'], // a colour per pair
 }
-// The snack: a pixel heart, like the one the bouncing heads make (w = its shine)
-const HEART = ['.##...##.', '#ww#.####', '#w#######', '#########', '.#######.', '..#####..', '...###...', '....#....']
+
+// The fruit, as pixel art: each a picture and the colours its letters stand for
+const FRUITS = [
+  {
+    name: 'apple',
+    colours: { r: '#e8423f', d: '#b8282a', w: '#ffd7d0', g: '#4caf50', b: '#7a4a24' },
+    rows: ['....bg...', '....b....', '.rrrdrrr.', 'rwrrrrrrr', 'rwrrrrrrd', 'rrrrrrrrd', 'rrrrrrrrd', '.rrrrrrd.', '..rr.rd..'],
+  },
+  {
+    name: 'cherries',
+    colours: { r: '#d8263c', w: '#ff9aa8', g: '#4caf50' },
+    rows: ['.....gg..', '....g.g..', '...g...g.', '..g....g.', '.rr...rr.', 'rwrr.rwrr', 'rrrr.rrrr', 'rrrr.rrrr', '.rr...rr.'],
+  },
+  {
+    name: 'orange',
+    colours: { o: '#f59a23', d: '#d9771a', w: '#ffd59a', g: '#4caf50' },
+    rows: ['....g....', '...gg....', '..ooooo..', '.wooooood', 'owooooood', 'ooooooood', 'ooooooood', '.ooooood.', '..ooood..'],
+  },
+  {
+    name: 'strawberry',
+    colours: { r: '#e8334a', y: '#ffe27a', g: '#4caf50' },
+    rows: ['..g.g.g..', '.ggggggg.', 'rrrrrrrrr', 'ryrrryrrr', 'rrrryrrry', '.ryrrrrr.', '.rrrryrr.', '..rryrr..', '...rrr...'],
+  },
+  {
+    name: 'grapes',
+    colours: { p: '#8a5cd6', w: '#c9b2f2', g: '#4caf50' },
+    rows: ['....gg...', '.....g...', '..pp.pp..', '.pwppwpp.', '.pppppppp', '..pwpppp.', '..pppppp.', '...pppp..', '....pp...'],
+  },
+]
+// Which fruit a snack is: mixed up, but the same one for as long as it sits there
+const fruitFor = (game) => FRUITS[(game.score * 2 + game.food[0] + game.food[1]) % FRUITS.length]
 
 const centre = ([x, y]) => [x * CELL + CELL / 2, TOP + y * CELL + CELL / 2]
-// Neighbouring cells (not a wrap round the edge, in Easy Mode), so the tail joins up between them
-const touching = ([ax, ay], [bx, by]) => Math.abs(ax - bx) + Math.abs(ay - by) === 1
 
-function heart(ctx, x, y, time) {
-  const px = 3 * (1 + Math.sin(time * 5) * 0.06)
-  const left = x - (HEART[0].length * px) / 2
-  const top = y - (HEART.length * px) / 2
-  HEART.forEach((line, r) =>
+function fruit(ctx, kind, x, y, time, bob = true) {
+  const px = 3 * (bob ? 1 + Math.sin(time * 5) * 0.06 : 1)
+  const left = x - (kind.rows[0].length * px) / 2
+  const top = y - (kind.rows.length * px) / 2
+  // A soft shadow under it, then the fruit
+  ctx.fillStyle = 'rgb(46 42 69 / 0.18)'
+  ctx.beginPath()
+  ctx.ellipse(x, y + (kind.rows.length * px) / 2, 9, 3, 0, 0, Math.PI * 2)
+  ctx.fill()
+  kind.rows.forEach((line, r) =>
     [...line].forEach((c, i) => {
       if (c === '.') return
-      ctx.fillStyle = c === 'w' ? '#ffd2e1' : '#ff3d7f'
+      ctx.fillStyle = kind.colours[c]
       ctx.fillRect(left + i * px, top + r * px, px + 0.5, px + 0.5)
     }),
   )
 }
 
+// Where each segment is drawn this frame: partway from the cell it was in to the one it's in now,
+// as far through the move as the clock has got. Through a portal or round a wrapped wall it's a
+// jump, so those go straight there.
+function bodyPoints(game) {
+  const t = game.dead || !game.prev ? 1 : Math.min(1, game.clock / tickFor(game.score, game.easy))
+  return game.snake.map((cell, i) => {
+    const [x, y] = centre(cell)
+    const from = game.prev?.[i]
+    if (!from || Math.abs(from[0] - cell[0]) + Math.abs(from[1] - cell[1]) !== 1) return [x, y]
+    const [fx, fy] = centre(from)
+    return [fx + (x - fx) * t, fy + (y - fy) * t]
+  })
+}
+
 function draw(ctx, game, head, looks, time) {
+  const W = game.cols * CELL // the board's width: wider on a desktop
   // The board, chequered
   for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < COLS; x++) {
+    for (let x = 0; x < game.cols; x++) {
       ctx.fillStyle = COLOURS.board[(x + y) % 2]
       ctx.fillRect(x * CELL, TOP + y * CELL, CELL, CELL)
     }
@@ -75,7 +122,7 @@ function draw(ctx, game, head, looks, time) {
     ctx.lineWidth = 3
     ctx.setLineDash([8, 8])
     ctx.lineDashOffset = -time * 20
-    ctx.strokeRect(1.5, TOP + 1.5, WIDTH - 3, ROWS * CELL - 3)
+    ctx.strokeRect(1.5, TOP + 1.5, W - 3, ROWS * CELL - 3)
     ctx.setLineDash([])
     ctx.globalAlpha = 1
   }
@@ -108,40 +155,51 @@ function draw(ctx, game, head, looks, time) {
     ctx.fillStyle = COLOURS.rock[1]
     ctx.fillRect(cx - 7, cy - 7, 6, 4)
   }
-  if (game.food) heart(ctx, ...centre(game.food), time)
+  if (game.food) fruit(ctx, fruitFor(game), ...centre(game.food), time)
 
-  // The tail: an outline pass, then the colour, each segment joined to the next
-  const { snake } = game
-  for (const [size, colour] of [
-    [CELL - 4, () => COLOURS.outline],
-    [CELL - 10, (i) => COLOURS.body[i % 2]],
+  // The tail: one smooth line through the segments (broken where it jumps through a portal or
+  // round a wall), an outline under the colour, and a shine down the middle
+  const points = bodyPoints(game)
+  const runs = [[points[0]]]
+  for (let i = 1; i < points.length; i++) {
+    const [px, py] = points[i - 1]
+    const [x, y] = points[i]
+    if (Math.hypot(x - px, y - py) > CELL * 1.1) runs.push([])
+    // Mid-turn the two segments either side of a corner are off at an angle: go through the corner
+    // cell's middle between them, so the tail turns square rather than cutting across
+    else if (Math.abs(x - px) > 0.5 && Math.abs(y - py) > 0.5) runs.at(-1).push(centre(game.snake[i]))
+    runs.at(-1).push(points[i])
+  }
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'miter'
+  for (const [width, colour] of [
+    [CELL - 4, COLOURS.outline],
+    [CELL - 10, COLOURS.body],
+    [4, COLOURS.shine],
   ]) {
-    for (let i = snake.length - 1; i >= 0; i--) {
-      const [cx, cy] = centre(snake[i])
-      ctx.fillStyle = colour(i)
+    ctx.lineWidth = width
+    ctx.strokeStyle = colour
+    for (const run of runs) {
       ctx.beginPath()
-      ctx.roundRect(cx - size / 2, cy - size / 2, size, size, size / 3)
-      ctx.fill()
-      if (i > 0 && touching(snake[i], snake[i - 1])) {
-        const [nx, ny] = centre(snake[i - 1])
-        if (cy === ny) ctx.fillRect(Math.min(cx, nx), cy - size / 2, CELL, size)
-        else ctx.fillRect(cx - size / 2, Math.min(cy, ny), size, CELL)
-      }
+      ctx.moveTo(...run[0])
+      // A single point still needs a line to show its round end
+      for (const p of run.length > 1 ? run.slice(1) : [[run[0][0] + 0.01, run[0][1]]]) ctx.lineTo(...p)
+      ctx.stroke()
     }
   }
   // The head itself, facing the way it's going
-  const [hx, hy] = centre(snake[0])
+  const [hx, hy] = points[0]
   looks.draw(ctx, head, { x: hx, y: hy, size: CELL * 1.3, facing: facing(game.dir), time, alpha: game.dead ? 0.6 : 1 })
 
-  // The score strip
+  // The score strip, with the fruit that's out
   ctx.fillStyle = COLOURS.strip
-  ctx.fillRect(0, 0, WIDTH, TOP)
+  ctx.fillRect(0, 0, W, TOP)
   ctx.font = '800 24px system-ui, sans-serif'
   ctx.textAlign = 'left'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = '#fff'
   ctx.fillText(String(game.score), 14, TOP / 2 + 1)
-  heart(ctx, WIDTH - 24, TOP / 2, 0)
+  if (game.food) fruit(ctx, fruitFor(game), W - 24, TOP / 2 - 2, time, false)
 }
 
 export default function Snake() {
@@ -153,13 +211,15 @@ export default function Snake() {
   const swipe = useRef(null) // where the finger was, while it's down
   const { player } = useCheats()
   const [phase, setPhase] = useState('ready') // ready | playing | over
+  // A wider board on a wide window (components/useWide.js), picked as each game is set up
+  const wide = useWide()
+  const wideRef = useRef(wide)
+  wideRef.current = wide
+  const [boardWide, setBoardWide] = useState(false)
   const [score, setScore] = useState(0)
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null)
-  // Off to start with, like the prerendered page; the saved ones load after mount
-  const [settings, setSettings] = useState({ wrap: false, obstacles: false, portals: false })
-  const settingsRef = useRef(settings)
-  settingsRef.current = settings
+  const [settings, toggleSetting, settingsRef] = useGameSettings('snake', SETTINGS)
   const GAME = snakeGame(settings)
   const [best, record] = useBest(GAME)
   const { run, begin } = useRun(GAME)
@@ -170,36 +230,26 @@ export default function Snake() {
   recordRef.current = record
   const phaseRef = useRef(phase)
   phaseRef.current = phase
+  const { pause, resume } = usePause(phaseRef, setPhase, {
+    // Let go of anything held, so it isn't still held on the way back
+    onPause: () => {
+      swipe.current = null
+    },
+  })
 
-  const fresh = () => start({ ...settingsRef.current, easy: cheatOn('easy') })
+  const fresh = () => {
+    setBoardWide(wideRef.current)
+    return start({ ...settingsRef.current, easy: cheatOn('easy'), cols: wideRef.current ? WIDE_COLS : COLS })
+  }
 
+  // New settings (or the saved ones, once they load): a fresh board with them, and their scores
   useEffect(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}')
-      const loaded = Object.fromEntries(SETTING_NAMES.map(({ id }) => [id, saved[id] === true]))
-      settingsRef.current = loaded
-      setSettings(loaded)
-      game.current = fresh()
-    } catch {
-      // Nothing saved, or storage blocked
-    }
-  }, [])
-
-  // A setting changed: a fresh board with it, and its own scores
-  function toggleSetting(id) {
-    const next = { ...settingsRef.current, [id]: !settingsRef.current[id] }
-    settingsRef.current = next
-    setSettings(next)
-    try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(next))
-    } catch {
-      // Not remembered, then
-    }
+    if (phaseRef.current === 'playing' || phaseRef.current === 'paused') return
     game.current = fresh()
     setScores(null)
     setScore(0)
     setPhase('ready')
-  }
+  }, [GAME, wide])
 
   useEffect(() => {
     const sheet = new Image()
@@ -240,7 +290,7 @@ export default function Snake() {
           setNewBest(!game.current.easy && recordRef.current(game.current.score))
         }
       }
-      ctx.setTransform(el.width / WIDTH, 0, 0, el.height / HEIGHT, 0, 0)
+      ctx.setTransform(el.width / (game.current.cols * CELL), 0, 0, el.height / HEIGHT, 0, 0)
       draw(ctx, game.current, head.current, looks.current, now / 1000)
       animation = requestAnimationFrame(tick)
     }
@@ -261,7 +311,7 @@ export default function Snake() {
   }
   // Steer (starting the game first, if it's waiting)
   function steer(dir) {
-    if (phaseRef.current === 'over') return
+    if (phaseRef.current === 'over' || phaseRef.current === 'paused') return
     if (phaseRef.current === 'ready') play()
     const before = game.current
     game.current = turn(before, dir)
@@ -307,26 +357,11 @@ export default function Snake() {
         <SoundToggle />
       </p>
       <h1 className="page-title">Snake</h1>
-      <p className="lede">Swipe, or use the arrow keys, to steer. Eat the hearts. Don't hit the walls, or yourself.</p>
-      <div className="game-settings" role="group" aria-label="Settings">
-        {SETTING_NAMES.map(({ id, name }) => (
-          <button
-            key={id}
-            type="button"
-            role="switch"
-            aria-checked={settings[id]}
-            className="game-setting"
-            disabled={phase === 'playing'}
-            onClick={() => toggleSetting(id)}
-          >
-            {name}
-          </button>
-        ))}
-      </div>
+      <p className="lede">Swipe, or use the arrow keys, to steer. Eat the fruit. Don't hit the walls, or yourself.</p>
 
       <div className="game-layout">
         <div
-          className="game-stage swipe-stage"
+          className={`game-stage swipe-stage${boardWide ? ' wide' : ''}`}
           ref={stage}
           onPointerDown={down}
           onPointerMove={move}
@@ -352,6 +387,9 @@ export default function Snake() {
               </button>
             </div>
           )}
+          {phase === 'playing' && <PauseButton onPause={pause} />}
+          {phase === 'paused' && <Paused onResume={resume} />}
+          <GameSettings options={SETTINGS} settings={settings} onToggle={toggleSetting} hidden={phase === 'playing' || phase === 'paused'} />
         </div>
         <ScoreBoard game={GAME} scores={scores} />
       </div>

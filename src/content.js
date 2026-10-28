@@ -166,6 +166,12 @@ export const games = [
 		icon: "🧱",
 		note: "I'm the ball again. Knock out every brick, five levels and round again.",
 	},
+	{
+		to: "/games/bubbles",
+		label: "Bubbles",
+		icon: "🫧",
+		note: "Aim, fire, match three. Bombs, lightning and rainbow shots.",
+	},
 ];
 
 export const thingsToDo = [
@@ -197,7 +203,7 @@ export const thingsToDo = [
 	{
 		to: "/games",
 		label: "Games",
-		note: "Flappy Head, Bonk, pinball, Snake, Invaders and Bricks. Get your initials on the high scores.",
+		note: "Flappy Head, Bonk, pinball, Snake, Invaders, Bricks and Bubbles. Get your initials on the high scores.",
 	},
 	{
 		to: "/find-me",
@@ -278,6 +284,10 @@ export const pageMeta = {
 	"/games/bricks": {
 		title: "Bricks",
 		description: "Knock out rows of pastel bricks, with Caleb's pixel head as the ball.",
+	},
+	"/games/bubbles": {
+		title: "Bubbles",
+		description: "A bubble shooter with Caleb's head in the launcher. Match three, drop the rest.",
 	},
 	"/games/invaders": {
 		title: "Invaders",

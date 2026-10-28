@@ -1,5 +1,7 @@
+import { allSettingsGames, settingsGame } from './settings.js'
+
 // The rules of Flappy Head (pages/FlappyHead.jsx), kept free of the DOM so they can be unit tested.
-// The world is a fixed WIDTH × HEIGHT box in its own units; the page scales it to fit the screen.
+// The world is a WIDTH (wider on a desktop) × HEIGHT box in its own units; the page scales it to fit.
 // The head stays at HEAD_X while the pipes scroll past; y grows downwards.
 export const WIDTH = 360
 export const HEIGHT = 640
@@ -16,24 +18,58 @@ const GAP = { start: 176, min: 136, shrink: 2 } // the opening narrows by `shrin
 const EDGE = 64 // keep openings at least this far from the top and the ground
 // Easy Mode (a secret cheat): openings this much wider, and a gentler fall
 const EASY = { gap: 28, gravity: 0.88 }
+// Moving pipes: each opening drifts up and down this far as it comes, at its own pace
+const DRIFT = { reach: 46, every: 70 } // px either way, px scrolled per radian
+// Moon gravity: a floatier fall, and softer flaps
+const MOON = { gravity: 0.5, flap: 0.72 }
+
+export const SETTINGS = [
+  { id: 'moving', name: 'Moving pipes', note: 'The gaps drift up and down as they come.' },
+  { id: 'moon', name: 'Moon gravity', note: 'Floaty falls and soft flaps. Harder than it sounds.' },
+]
+export const flappyGame = (settings = {}) => settingsGame('flappy-head', SETTINGS, settings)
+export const FLAPPY_GAMES = allSettingsGames('flappy-head', SETTINGS)
 
 // Seconds between pipes, so the server can tell a real score from a made-up one
 export const SECONDS_PER_PIPE = SPACING / SPEED
 
 export const gapFor = (score, easy = false) => Math.max(GAP.min, GAP.start - score * GAP.shrink) + (easy ? EASY.gap : 0)
 
-export function pipe(x, score, random = Math.random, easy = false) {
+// The opening's range of heights, for a gap that size
+const range = (gap) => [EDGE + gap / 2, HEIGHT - GROUND - EDGE - gap / 2]
+
+export function pipe(x, score, random = Math.random, easy = false, moving = false) {
   const gap = gapFor(score, easy)
-  const top = EDGE + gap / 2
-  const bottom = HEIGHT - GROUND - EDGE - gap / 2
-  return { x, gapY: top + random() * (bottom - top), gap, scored: false }
+  const [top, bottom] = range(gap)
+  const gapY = top + random() * (bottom - top)
+  // A moving one keeps where it started (`baseY`) and where it is in its drift (`phase`)
+  return { x, gapY, gap, scored: false, ...(moving && { baseY: gapY, phase: random() * Math.PI * 2 }) }
 }
 
-export function start({ radius = RADIUS, easy = false } = {}, random = Math.random) {
-  return { y: HEIGHT * 0.42, vy: 0, radius, easy, score: 0, dead: false, pipes: [pipe(WIDTH + 80, 0, random, easy)] }
+// Where a moving pipe's opening is, at its place on the screen
+function drift(p) {
+  if (p.baseY == null) return p
+  const [top, bottom] = range(p.gap)
+  return { ...p, gapY: Math.max(top, Math.min(bottom, p.baseY + Math.sin(p.x / DRIFT.every + p.phase) * DRIFT.reach)) }
 }
 
-export const flap = (state) => (state.dead ? state : { ...state, vy: FLAP })
+// `width`: the world's width (wider on a desktop: more of what's coming is in view)
+export function start({ radius = RADIUS, easy = false, moving = false, moon = false, width = WIDTH } = {}, random = Math.random) {
+  return {
+    width,
+    y: HEIGHT * 0.42,
+    vy: 0,
+    radius,
+    easy,
+    moving,
+    moon,
+    score: 0,
+    dead: false,
+    pipes: [pipe(width + 80, 0, random, easy, moving)],
+  }
+}
+
+export const flap = (state) => (state.dead ? state : { ...state, vy: FLAP * (state.moon ? MOON.flap : 1) })
 
 // Does a circle at (cx, cy) touch the rectangle from (x, y) to (x + w, y + h)?
 export function hits(cx, cy, r, x, y, w, h) {
@@ -45,7 +81,8 @@ export function hits(cx, cy, r, x, y, w, h) {
 // One frame. Returns the new state; `dead` once it hits a pipe or the ground.
 export function step(state, dt, random = Math.random) {
   if (state.dead) return state
-  const vy = Math.min(MAX_FALL, state.vy + GRAVITY * (state.easy ? EASY.gravity : 1) * dt)
+  const gravity = GRAVITY * (state.easy ? EASY.gravity : 1) * (state.moon ? MOON.gravity : 1)
+  const vy = Math.min(MAX_FALL, state.vy + gravity * dt)
   // The sky has a lid: bumping it stops the climb rather than ending the game
   let y = state.y + vy * dt
   const ceiling = state.radius
@@ -53,7 +90,7 @@ export function step(state, dt, random = Math.random) {
   if (climbing) y = ceiling
   let score = state.score
   let pipes = state.pipes
-    .map((p) => ({ ...p, x: p.x - SPEED * dt }))
+    .map((p) => drift({ ...p, x: p.x - SPEED * dt }))
     .filter((p) => p.x + PIPE_WIDTH > -10)
     .map((p) => {
       if (p.scored || p.x + PIPE_WIDTH >= HEAD_X - state.radius) return p
@@ -61,7 +98,8 @@ export function step(state, dt, random = Math.random) {
       return { ...p, scored: true }
     })
   const last = pipes.at(-1)
-  if (!last || last.x <= WIDTH - SPACING) pipes = [...pipes, pipe((last?.x ?? WIDTH) + SPACING, score, random, state.easy)]
+  const width = state.width ?? WIDTH
+  if (!last || last.x <= width - SPACING) pipes = [...pipes, pipe((last?.x ?? width) + SPACING, score, random, state.easy, state.moving)]
 
   const r = state.radius
   const crashed =

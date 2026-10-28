@@ -1,18 +1,26 @@
+import { allSettingsGames, settingsGame } from './settings.js'
+
 // The rules of Snake (pages/Snake.jsx), kept free of the DOM so they can be unit tested. The board
 // is COLS × ROWS cells; the snake is a list of cells, head first, and moves one cell per tick,
 // quicker with each snack. Turns queue up (two at most), so a quick double swipe still lands.
-// Settings, each its own high-score board (snakeGame()):
-// - wrap: the walls wrap round to the other side instead of ending it
-// - obstacles: rocks to steer round, and another one every few snacks
-// - portals: two pairs of portals; go into one and come out of its partner, still going the same way
-export const COLS = 12
+// Each move keeps where the snake was (`prev`), so the page can glide it between cells.
+// Settings, each mix its own high-score board (lib/settings.js):
+export const COLS = 12 // on a phone
+export const WIDE_COLS = 28 // on a desktop's wider board (`cols`)
 export const ROWS = 20
 const START_LENGTH = 3
 const TICK = { start: 0.16, min: 0.085, faster: 0.004 } // seconds per move
 const EASY = { slower: 1.3 } // Easy Mode (a secret cheat): this much slower
 const ROCKS = { start: 6, every: 4 } // obstacles: how many to start with, and a new one every few snacks
 const PORTAL_PAIRS = 2
-export const SETTINGS = ['wrap', 'obstacles', 'portals']
+export const SETTINGS = [
+  // The walls wrap round to the other side instead of ending it
+  { id: 'wrap', name: 'Wrap-around walls', note: 'Off one side, back on the other.' },
+  // Rocks to steer round, and another one every few snacks
+  { id: 'obstacles', name: 'Obstacles', note: 'Rocks to steer round, and another every few fruit.' },
+  // Two pairs of portals: go into one and come out of its partner, still going the same way
+  { id: 'portals', name: 'Portals', note: 'In one, out of its partner, still going the same way.' },
+]
 export const DIRS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] }
 const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' }
 // The quickest a snack could ever be eaten, so the server can tell a real score from a made-up one:
@@ -20,10 +28,8 @@ const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' }
 export const SECONDS_PER_SNACK = TICK.min
 
 // The high-score board for a mix of settings: "snake", "snake-wrap", "snake-obstacles-portals", …
-export const snakeGame = (settings = {}) => ['snake', ...SETTINGS.filter((s) => settings[s])].join('-')
-export const SNAKE_GAMES = Array.from({ length: 2 ** SETTINGS.length }, (_, n) =>
-  snakeGame(Object.fromEntries(SETTINGS.map((s, i) => [s, Boolean(n & (1 << i))]))),
-)
+export const snakeGame = (settings = {}) => settingsGame('snake', SETTINGS, settings)
+export const SNAKE_GAMES = allSettingsGames('snake', SETTINGS)
 
 export const tickFor = (score, easy = false) =>
   Math.max(TICK.min, TICK.start - score * TICK.faster) * (easy ? EASY.slower : 1)
@@ -31,25 +37,30 @@ export const tickFor = (score, easy = false) =>
 const same = ([ax, ay], [bx, by]) => ax === bx && ay === by
 const taken = (s) => [...s.snake, ...s.rocks, ...s.portals.flat(), ...(s.food ? [s.food] : [])]
 
-// A random empty cell, kept clear of `avoid` (null if the board's full)
-function freeCell(avoid, random, allowed = () => true) {
-  const used = new Set(avoid.map(([x, y]) => y * COLS + x))
+// A random empty cell on a board `cols` wide, kept clear of `avoid` (null if the board's full)
+function freeCell(cols, avoid, random, allowed = () => true) {
+  const used = new Set(avoid.map(([x, y]) => y * cols + x))
   const free = []
   for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < COLS; x++) if (!used.has(y * COLS + x) && allowed([x, y])) free.push([x, y])
+    for (let x = 0; x < cols; x++) if (!used.has(y * cols + x) && allowed([x, y])) free.push([x, y])
   }
   return free.length ? free[Math.floor(random() * free.length)] : null
 }
-export const placeFood = (state, random = Math.random) => freeCell(taken({ ...state, food: null }), random)
+export const placeFood = (state, random = Math.random) => freeCell(state.cols, taken({ ...state, food: null }), random)
 
 // Rocks and portals stay out of the starting row (and the rows either side), and off the edges, so
 // the start is never a trap and nothing blocks a portal's way out
-const clearOfStart = ([x, y]) => Math.abs(y - Math.floor(ROWS / 2)) > 1 && x > 0 && x < COLS - 1 && y > 0 && y < ROWS - 1
+const clearOfStart =
+  (cols) =>
+  ([x, y]) =>
+    Math.abs(y - Math.floor(ROWS / 2)) > 1 && x > 0 && x < cols - 1 && y > 0 && y < ROWS - 1
 
-export function start({ easy = false, wrap = false, obstacles = false, portals = false } = {}, random = Math.random) {
+export function start({ easy = false, wrap = false, obstacles = false, portals = false, cols = COLS } = {}, random = Math.random) {
   const y = Math.floor(ROWS / 2)
   const s = {
+    cols,
     snake: Array.from({ length: START_LENGTH }, (_, i) => [3 - i, y]),
+    prev: null,
     dir: 'right',
     queue: [],
     rocks: [],
@@ -64,12 +75,14 @@ export function start({ easy = false, wrap = false, obstacles = false, portals =
   }
   if (portals) {
     for (let i = 0; i < PORTAL_PAIRS; i++) {
-      const a = freeCell(taken(s), random, clearOfStart)
-      const b = freeCell([...taken(s), a], random, clearOfStart)
+      const a = freeCell(cols, taken(s), random, clearOfStart(cols))
+      const b = freeCell(cols, [...taken(s), a], random, clearOfStart(cols))
       s.portals.push([a, b])
     }
   }
-  if (obstacles) for (let i = 0; i < ROCKS.start; i++) s.rocks.push(freeCell(taken(s), random, clearOfStart))
+  // More rocks on a bigger board
+  const rocks = Math.round((ROCKS.start * cols) / COLS)
+  if (obstacles) for (let i = 0; i < rocks; i++) s.rocks.push(freeCell(cols, taken(s), random, clearOfStart(cols)))
   s.food = placeFood(s, random)
   return s
 }
@@ -98,22 +111,22 @@ function move(state, random) {
   x += dx
   y += dy
   if (state.wrap) {
-    x = (x + COLS) % COLS
+    x = (x + state.cols) % state.cols
     y = (y + ROWS) % ROWS
   }
-  if (x < 0 || x >= COLS || y < 0 || y >= ROWS) return { ...state, dir, queue, dead: true }
+  if (x < 0 || x >= state.cols || y < 0 || y >= ROWS) return { ...state, dir, queue, dead: true }
   const cell = through(state.portals, [x, y])
   const eating = state.food && same(cell, state.food)
   // The tail moves out of the way as the head moves in, unless it's growing
   const body = eating ? state.snake : state.snake.slice(0, -1)
   if (body.some((b) => same(b, cell)) || state.rocks.some((r) => same(r, cell))) return { ...state, dir, queue, dead: true }
-  const s = { ...state, dir, queue, snake: [cell, ...body] }
+  const s = { ...state, dir, queue, snake: [cell, ...body], prev: state.snake }
   if (!eating) return s
   s.score++
   // Obstacles: another rock every few snacks, somewhere not right in front of the head
   if (s.obstacles && s.score % ROCKS.every === 0) {
     const ahead = [cell[0] + dx, cell[1] + dy]
-    const rock = freeCell([...taken({ ...s, food: null }), ahead], random, ([rx, ry]) => Math.abs(rx - cell[0]) + Math.abs(ry - cell[1]) > 2)
+    const rock = freeCell(s.cols, [...taken({ ...s, food: null }), ahead], random, ([rx, ry]) => Math.abs(rx - cell[0]) + Math.abs(ry - cell[1]) > 2)
     if (rock) s.rocks = [...s.rocks, rock]
   }
   s.food = placeFood(s, random)

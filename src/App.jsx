@@ -12,6 +12,7 @@ import CheatCodes from './pages/CheatCodes.jsx'
 import DecisionWheel from './pages/DecisionWheel.jsx'
 import Bonk from './pages/Bonk.jsx'
 import Bricks from './pages/Bricks.jsx'
+import Bubbles from './pages/Bubbles.jsx'
 import FlappyHead from './pages/FlappyHead.jsx'
 import Games from './pages/Games.jsx'
 import GuestbookAdmin from './pages/GuestbookAdmin.jsx'
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="games/snake" element={<Snake />} />
         <Route path="games/invaders" element={<Invaders />} />
         <Route path="games/bricks" element={<Bricks />} />
+        <Route path="games/bubbles" element={<Bubbles />} />
         <Route path="cotg-submission" element={<Placeholder title="CoTG" blurb="Submissions aren't open yet. When they are, this is where they'll go." />} />
         <Route path="*" element={<NotFound />} />
       </Route>
