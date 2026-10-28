@@ -22,7 +22,9 @@
 
   --gutter: clamp(16px, 4vw, 48px);
   --measure: 68ch;
-  color-scheme: light;
+  /* "only": the site has its own dark theme (below, and the theme button), so phones' automatic
+     dark mode mustn't darken the light one on top of it */
+  color-scheme: only light;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -3328,12 +3330,17 @@ a {
 }
 /* The doodle pad: a taped-down sheet of sketch paper, with tools and a tin of coloured pencils
    underneath. Paper stays paper in dark mode. The grain is SVG noise, under the drawing. */
-.doodle-pad {
+.doodle-pad,
+.doodle {
   --paper-sheet: #fbf7ec;
   --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .36 0 0 0 0 .26 0 0 0 .35 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.doodle-pad {
   display: grid;
   gap: 14px;
   width: min(340px, 100%);
+  /* Paper is paper, even in a browser's automatic dark mode */
+  color-scheme: only light;
   /* A drag from the paper draws, and mustn't select the page's text (and scroll along with it) */
   user-select: none;
   -webkit-user-select: none;
@@ -3365,7 +3372,8 @@ a {
   display: block;
   width: 100%;
   aspect-ratio: 1;
-  background: var(--paper-grain), var(--paper-sheet, #fbf7ec);
+  background: var(--paper-grain), var(--paper-sheet);
+  color-scheme: only light;
 }
 .doodle-canvas {
   cursor: crosshair;
