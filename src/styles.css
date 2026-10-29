@@ -3566,17 +3566,32 @@ a {
   line-height: 1;
 }
 .game-back {
+  margin: 0 0 8px;
+}
+.game-back a {
+  font-weight: 600;
+  text-decoration: none;
+}
+/* The strip just above a game (components/GameBar.jsx), so its buttons stay off the game itself:
+   anything the game shows there on the left (Pinball's score), its buttons on the right */
+.game-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  margin: 0 0 8px;
+  gap: 8px;
+  min-height: 36px;
+  margin-bottom: 8px;
 }
-/* Sound effects on or off, for every game (components/SoundToggle.jsx) */
-.game-tools {
-  display: inline-flex;
+.game-bar-info {
+  display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+.game-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 /* The secret Easy Mode cheat is on */
 .easy-badge {
@@ -3584,50 +3599,48 @@ a {
   font: 700 0.75rem/1 var(--body);
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
   color: var(--ink);
   background: var(--mint);
   border-radius: 999px;
 }
-.sound-toggle {
-  min-height: 36px;
-  padding: 0 14px;
-  font: 600 0.9rem/1 var(--body);
-  color: var(--ink);
-  background: var(--paper);
-  border: 2px solid var(--line);
-  border-radius: 999px;
-  cursor: pointer;
-}
-.sound-toggle[aria-pressed='false'] {
-  color: var(--ink-soft);
-  border-style: dashed;
-}
-.game-back a {
-  font-weight: 600;
-  text-decoration: none;
-}
-/* Full screen (components/Fullscreen.jsx): a button for touch screens, and the game page taking
-   over the screen, the board as big as fits under the button bar */
-.fullscreen-toggle {
-  display: none;
+/* The round buttons in it: settings, pause, sound, full screen (and Bubbles' aiming guide) */
+.game-tool {
+  position: relative;
+  display: grid;
   place-items: center;
   width: 36px;
   height: 36px;
   padding: 0;
+  font-size: 1rem;
   color: var(--ink);
   background: var(--paper);
   border: 2px solid var(--line);
-  border-radius: 999px;
+  border-radius: 50%;
   cursor: pointer;
 }
-.fullscreen-toggle svg {
-  width: 18px;
-  height: 18px;
+.game-tool svg {
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
-  stroke-width: 2.4;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+.game-tool:focus-visible {
+  outline: 3px solid var(--blue-ink);
+  outline-offset: 2px;
+}
+/* Off: sound, or the aiming guide */
+.game-tool[aria-pressed='false']:not(.fullscreen-toggle) {
+  color: var(--ink-soft);
+  border-style: dashed;
+}
+/* Full screen (components/Fullscreen.jsx): a button for touch screens, and the game page taking
+   over the screen, the game as big as fits */
+.fullscreen-toggle {
+  display: none;
 }
 @media (pointer: coarse) {
   .fullscreen-toggle {
@@ -3653,17 +3666,13 @@ a {
     calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
   background: var(--paper);
 }
-/* Just the buttons and the game: no title, blurb, way back or high scores (or pinball's tables) */
-:root[data-game-fullscreen] .game-page > :not(.game-back, .game-layout),
-:root[data-game-fullscreen] .game-back a,
+/* Just the game and its bar: no way back, title, blurb or high scores (or pinball's tables) */
+:root[data-game-fullscreen] .game-page > :not(.game-layout),
 :root[data-game-fullscreen] .game-layout > :not(:first-child) {
   display: none;
 }
-:root[data-game-fullscreen] .game-back {
-  justify-content: flex-end;
-  margin: 0 0 6px;
-}
-/* The space left, which the board's sized to (in cq units, the layout being its container) */
+/* The space left, which the game's sized to (in cq units, the layout being its container): the
+   board's height is what's left under the bar */
 :root[data-game-fullscreen] .game-layout {
   flex: 1;
   min-height: 0;
@@ -3673,20 +3682,15 @@ a {
   margin: 0;
   container-type: size;
 }
-:root[data-game-fullscreen] .game-stage {
-  width: min(100cqw, 100cqh * 9 / 16);
-  max-width: none;
+:root[data-game-fullscreen] .game-screen {
+  width: min(100cqw, (100cqh - 44px) * 9 / 16);
 }
-:root[data-game-fullscreen] .game-stage.wide {
-  width: min(100cqw, 100cqh * 21 / 16);
-}
-/* Pinball's score line sits on top of the table */
-:root[data-game-fullscreen] :is(.pinball-stage, .pinball-hud) {
-  width: min(100cqw, (100cqh - 38px) * 9 / 16);
+:root[data-game-fullscreen] .game-screen:has(.wide) {
+  width: min(100cqw, (100cqh - 44px) * 21 / 16);
 }
 /* Bonk's board is about square, plus its score bar */
-:root[data-game-fullscreen] .bonk {
-  width: min(100cqw, 100cqh - 60px);
+:root[data-game-fullscreen] .game-screen:has(.bonk) {
+  width: min(100cqw, 100cqh - 100px);
 }
 .game-layout {
   display: grid;
@@ -3701,11 +3705,15 @@ a {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* Flappy Head: a portrait screen that fits the window */
+/* A game and its bar (components/GameBar.jsx): a portrait screen that fits the window, with room
+   for the bar on top */
+.game-screen {
+  justify-self: center;
+  width: min(100%, calc((100dvh - 154px) * 9 / 16), 420px);
+}
 .game-stage {
   position: relative;
-  justify-self: center;
-  width: min(100%, calc((100dvh - 110px) * 9 / 16), 420px);
+  width: 100%;
   aspect-ratio: 9 / 16;
   border: 3px solid var(--ink);
   border-radius: 18px;
@@ -3717,13 +3725,20 @@ a {
   /* No blue flash on a tap: each game answers a tap its own way (lib/feedback.js) */
   -webkit-tap-highlight-color: transparent;
 }
-/* Snake and Invaders: a finger dragging on the screen steers, rather than scrolling the page */
+/* Bonk's board, and its score bar, about square. The 100% is a max-width: the game layout's
+   column is sized by the board, and the holes have no size of their own, so a percentage width
+   shrank it to nothing on desktop */
+.game-screen:has(.bonk) {
+  width: min(440px, calc(100dvh - 134px));
+  max-width: 100%;
+}
 /* On a wide window the games get an arcade-shaped board (components/useWide.js): as big as fits the
    window, with the high scores moved underneath to give it the page's whole width */
+.game-screen:has(.game-stage.wide) {
+  width: min(100%, calc((100dvh - 154px) * 21 / 16));
+}
 .game-stage.wide {
   aspect-ratio: 21 / 16;
-  width: calc((100dvh - 110px) * 21 / 16);
-  max-width: 100%;
 }
 .game-layout:has(.game-stage.wide) {
   grid-template-columns: minmax(0, 1fr);
@@ -3858,11 +3873,7 @@ a {
 .bonk {
   position: relative;
   justify-self: center;
-  /* Board and score bar both fit on the screen. The 100% is a max-width, not in the width: the
-     game layout's column is sized by the board, and the holes have no size of their own, so a
-     percentage width shrank it to nothing on desktop */
-  width: min(440px, calc(100dvh - 90px));
-  max-width: 100%;
+  width: 100%;
   padding: 16px;
   background: var(--bonk-board, #bfe8d6);
   transition: background-color 0.3s linear;
@@ -4012,35 +4023,12 @@ a {
   border-radius: 17px;
 }
 /* Pinball: pick a table, each in its own colours */
-/* Game settings (components/GameSettings.jsx): a cog in the corner of the game, below its score
-   strip, opening a panel of switches over it */
-.game-cog {
-  position: absolute;
-  top: 54px;
-  right: 10px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  color: #fff;
-  background: rgb(46 42 69 / 0.85);
-  border: 2px solid rgb(255 255 255 / 0.6);
-  border-radius: 50%;
-  cursor: pointer;
-}
+/* Game settings (components/GameSettings.jsx): a cog above the game, opening a panel of switches
+   over it */
 .game-cog svg {
-  width: 24px;
-  height: 24px;
-  fill: none;
-  stroke: currentColor;
+  width: 22px;
+  height: 22px;
   stroke-width: 1.8;
-  stroke-linejoin: round;
-}
-.game-cog:focus-visible {
-  outline: 3px solid var(--blue-ink);
-  outline-offset: 2px;
 }
 @media (prefers-reduced-motion: no-preference) {
   .game-cog:hover svg {
@@ -4139,78 +4127,15 @@ a {
   line-height: 1.3;
   color: var(--ink-soft);
 }
-/* Pause (components/Pause.jsx): in the cog's corner, while a game's being played */
-.game-pause {
-  position: absolute;
-  top: 54px;
-  right: 10px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  color: #fff;
-  background: rgb(46 42 69 / 0.6);
-  border: 2px solid rgb(255 255 255 / 0.5);
-  border-radius: 50%;
-  cursor: pointer;
-}
+/* Pause (components/Pause.jsx): above the game, in the cog's place, while it's being played */
 .game-pause svg {
-  width: 20px;
-  height: 20px;
   fill: currentColor;
-}
-.game-pause:focus-visible {
-  outline: 3px solid var(--blue-ink);
-  outline-offset: 2px;
-}
-/* Bubbles' aiming guide switch, under the pause button (or the cog) */
-.game-guide {
-  position: absolute;
-  top: 104px;
-  right: 10px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  padding: 0;
-  color: #fff;
-  background: rgb(46 42 69 / 0.6);
-  border: 2px solid rgb(255 255 255 / 0.5);
-  border-radius: 50%;
-  cursor: pointer;
-}
-.game-guide[aria-pressed='false'] {
-  opacity: 0.65;
-}
-.game-guide svg {
-  width: 22px;
-  height: 22px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-}
-.game-guide:focus-visible {
-  outline: 3px solid var(--blue-ink);
-  outline-offset: 2px;
+  stroke: none;
 }
 .game-paused-hint {
   margin: 0;
   font-size: 0.85rem;
   color: var(--ink-soft);
-}
-/* Pinball has its score above the table, so the corner's clear */
-.pinball-stage .game-pause {
-  top: 10px;
-}
-/* Bonk's board has its score bar, not a canvas strip, along the top */
-.bonk .game-pause,
-.bonk .game-cog {
-  top: 58px;
-  right: 24px;
 }
 .pinball-tables {
   display: flex;
@@ -4245,18 +4170,16 @@ a {
 .pinball-tables .pinball-table-disco[aria-checked='true'] {
   background: linear-gradient(90deg, #e0559a, #f2a541, #3a8fd0, #8a5cd6);
 }
-/* Pinball: the score line sits above the table, so the table is a little shorter */
+/* Pinball: the score and ball in the bar above the table */
 .pinball-stage {
-  width: min(100%, calc((100dvh - 150px) * 9 / 16), 420px);
   touch-action: none; /* two thumbs on the flippers, not zooming or scrolling */
 }
 .pinball-hud {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  width: min(100%, calc((100dvh - 150px) * 9 / 16), 420px);
-  margin: 0 auto 8px;
-  font-size: 1.05rem;
+  flex-wrap: wrap;
+  gap: 0 12px;
+  margin: 0;
+  font-size: 1rem;
 }
 .pinball-hud strong {
   font-variant-numeric: tabular-nums;

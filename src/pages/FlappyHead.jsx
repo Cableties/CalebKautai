@@ -5,9 +5,9 @@ import { cheatOn, gameHead } from '../lib/gameHead.js'
 import { GROUND, HEAD_X, HEIGHT, PIPE_WIDTH, RADIUS, SETTINGS, SPACING, SPEED, WIDTH, facing, flap, flappyGame, start, step } from '../lib/flappy.js'
 import { mix, themeAt } from '../lib/themes.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
-import GameSettings, { useGameSettings } from '../components/GameSettings.jsx'
+import { useGameSettings, useSettingsPanel } from '../components/GameSettings.jsx'
 import { PauseButton, Paused, usePause } from '../components/Pause.jsx'
-import SoundToggle from '../components/SoundToggle.jsx'
+import GameBar from '../components/GameBar.jsx'
 import useWide, { WIDE_WIDTH } from '../components/useWide.js'
 import { feedback } from '../lib/feedback.js'
 import { useCheats } from '../components/Cheats.jsx'
@@ -359,6 +359,7 @@ export default function FlappyHead() {
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null) // the board, refreshed after saving
   const [settings, toggleSetting, settingsRef] = useGameSettings('flappy-head', SETTINGS)
+  const { cog, panel } = useSettingsPanel(SETTINGS, settings, toggleSetting)
   const GAME = flappyGame(settings)
   const [best, record] = useBest(GAME)
   const { run, begin } = useRun(GAME)
@@ -495,35 +496,38 @@ export default function FlappyHead() {
         <Link to="/games" viewTransition>
           ← All games
         </Link>
-        <SoundToggle />
       </p>
       <h1 className="page-title">Flappy Head</h1>
       <p className="lede">Tap, click or press Space to flap. Don't touch the pipes.</p>
 
       <div className="game-layout">
-        <div className={`game-stage${boardWide ? ' wide' : ''}`} ref={stage} onPointerDown={(e) => (e.preventDefault(), press())}>
-          <canvas ref={canvas} className="game-canvas" role="img" aria-label={`Flappy Head. Score: ${score}`} />
-          {phase === 'ready' && (
-            <div className="game-overlay game-overlay-hint">
-              <p>Tap to start</p>
-            </div>
-          )}
-          {phase === 'over' && (
-            <div className="game-overlay" onPointerDown={(e) => e.stopPropagation()}>
-              <h2>Splat!</h2>
-              <p className="game-final" role="status">
-                Score: <strong>{score}</strong>
-                {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
-              </p>
-              <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy} onSaved={setScores} />
-              <button type="button" className="button" onClick={play}>
-                Play again
-              </button>
-            </div>
-          )}
-          {phase === 'playing' && <PauseButton onPause={pause} />}
-          {phase === 'paused' && <Paused onResume={resume} />}
-          <GameSettings options={SETTINGS} settings={settings} onToggle={toggleSetting} hidden={phase === 'playing' || phase === 'paused'} />
+        <div className="game-screen">
+          <GameBar>
+            {phase === 'playing' ? <PauseButton onPause={pause} /> : phase !== 'paused' && cog}
+          </GameBar>
+          <div className={`game-stage${boardWide ? ' wide' : ''}`} ref={stage} onPointerDown={(e) => (e.preventDefault(), press())}>
+            <canvas ref={canvas} className="game-canvas" role="img" aria-label={`Flappy Head. Score: ${score}`} />
+            {phase === 'ready' && (
+              <div className="game-overlay game-overlay-hint">
+                <p>Tap to start</p>
+              </div>
+            )}
+            {phase === 'over' && (
+              <div className="game-overlay" onPointerDown={(e) => e.stopPropagation()}>
+                <h2>Splat!</h2>
+                <p className="game-final" role="status">
+                  Score: <strong>{score}</strong>
+                  {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
+                </p>
+                <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy} onSaved={setScores} />
+                <button type="button" className="button" onClick={play}>
+                  Play again
+                </button>
+              </div>
+            )}
+            {phase === 'paused' && <Paused onResume={resume} />}
+            {panel}
+          </div>
         </div>
         <ScoreBoard game={GAME} scores={scores} />
       </div>

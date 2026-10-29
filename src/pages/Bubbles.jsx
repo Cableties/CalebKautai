@@ -23,9 +23,9 @@ import {
   swap,
 } from '../lib/bubbles.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
-import GameSettings, { useGameSettings } from '../components/GameSettings.jsx'
+import { useGameSettings, useSettingsPanel } from '../components/GameSettings.jsx'
 import { PauseButton, Paused, usePause } from '../components/Pause.jsx'
-import SoundToggle from '../components/SoundToggle.jsx'
+import GameBar from '../components/GameBar.jsx'
 import useWide, { WIDE_WIDTH } from '../components/useWide.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { feedback } from '../lib/feedback.js'
@@ -327,17 +327,15 @@ function useGuide() {
   return [on, toggle, ref]
 }
 
-// The aiming guide's button: a target, crossed out while it's off. Taps on it stay on it, so they
-// don't aim or fire.
+// The aiming guide's button, above the game: a target, crossed out while it's off
 function GuideButton({ on, onToggle }) {
   return (
     <button
       type="button"
-      className="game-guide"
+      className="game-tool game-guide"
       aria-label="Aiming guide"
       aria-pressed={on}
       title={`Aiming guide: ${on ? 'on' : 'off'} (G)`}
-      onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         onToggle()
         // Let go of focus after a tap or click, so Space fires rather than pressing it again
@@ -373,6 +371,7 @@ export default function Bubbles() {
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null)
   const [settings, toggleSetting, settingsRef] = useGameSettings('bubbles', SETTINGS)
+  const { cog, panel } = useSettingsPanel(SETTINGS, settings, toggleSetting)
   const [guide, toggleGuide, guideRef] = useGuide()
   const level = useRef(0) // the level whose look is showing (lib/themes.js), fading to the next
   const GAME = bubblesGame(settings)
@@ -554,7 +553,6 @@ export default function Bubbles() {
         <Link to="/games" viewTransition>
           ← All games
         </Link>
-        <SoundToggle />
       </p>
       <h1 className="page-title">Bubbles</h1>
       <p className="lede">
@@ -563,37 +561,41 @@ export default function Bubbles() {
       </p>
 
       <div className="game-layout">
-        <div
-          className={`game-stage swipe-stage${boardWide ? ' wide' : ''}`}
-          ref={stage}
-          onPointerDown={down}
-          onPointerMove={move}
-          onPointerUp={up}
-          onPointerCancel={() => (aiming.current = false)}
-        >
-          <canvas ref={canvas} className="game-canvas" role="img" aria-label={`Bubbles. Score: ${score}`} />
-          {phase === 'ready' && (
-            <div className="game-overlay game-overlay-hint">
-              <p>Tap to start</p>
-            </div>
-          )}
-          {phase === 'over' && (
-            <div className="game-overlay" onPointerDown={(e) => e.stopPropagation()}>
-              <h2>Too low!</h2>
-              <p className="game-final" role="status">
-                Score: <strong>{score}</strong>
-                {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
-              </p>
-              <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy} onSaved={setScores} />
-              <button type="button" className="button" onClick={play}>
-                Play again
-              </button>
-            </div>
-          )}
-          {phase === 'playing' && <PauseButton onPause={pause} />}
-          {(phase === 'ready' || phase === 'playing') && <GuideButton on={guide} onToggle={switchGuide} />}
-          {phase === 'paused' && <Paused onResume={resume} />}
-          <GameSettings options={SETTINGS} settings={settings} onToggle={toggleSetting} hidden={phase === 'playing' || phase === 'paused'} />
+        <div className="game-screen">
+          <GameBar>
+            {(phase === 'ready' || phase === 'playing') && <GuideButton on={guide} onToggle={switchGuide} />}
+            {phase === 'playing' ? <PauseButton onPause={pause} /> : phase !== 'paused' && cog}
+          </GameBar>
+          <div
+            className={`game-stage swipe-stage${boardWide ? ' wide' : ''}`}
+            ref={stage}
+            onPointerDown={down}
+            onPointerMove={move}
+            onPointerUp={up}
+            onPointerCancel={() => (aiming.current = false)}
+          >
+            <canvas ref={canvas} className="game-canvas" role="img" aria-label={`Bubbles. Score: ${score}`} />
+            {phase === 'ready' && (
+              <div className="game-overlay game-overlay-hint">
+                <p>Tap to start</p>
+              </div>
+            )}
+            {phase === 'over' && (
+              <div className="game-overlay" onPointerDown={(e) => e.stopPropagation()}>
+                <h2>Too low!</h2>
+                <p className="game-final" role="status">
+                  Score: <strong>{score}</strong>
+                  {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
+                </p>
+                <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy} onSaved={setScores} />
+                <button type="button" className="button" onClick={play}>
+                  Play again
+                </button>
+              </div>
+            )}
+            {phase === 'paused' && <Paused onResume={resume} />}
+            {panel}
+          </div>
         </div>
         <ScoreBoard game={GAME} scores={scores} />
       </div>

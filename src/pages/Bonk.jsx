@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom'
 import { HEADS, POSES, TILTS, frame } from '../lib/bounce.js'
 import { DECOY, GAP_MS, HOLES, ROUND_MS, SETTINGS, bonkGame, freeHole, lanesFor, upTime } from '../lib/bonk.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
-import GameSettings, { useGameSettings } from '../components/GameSettings.jsx'
+import { useGameSettings, useSettingsPanel } from '../components/GameSettings.jsx'
 import { PauseButton, Paused, usePause } from '../components/Pause.jsx'
-import SoundToggle from '../components/SoundToggle.jsx'
+import GameBar from '../components/GameBar.jsx'
 import { feedback } from '../lib/feedback.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { cheatOn } from '../lib/gameHead.js'
@@ -64,6 +64,7 @@ export default function Bonk() {
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null)
   const [settings, toggleSetting] = useGameSettings('bonk', SETTINGS)
+  const { cog, panel } = useSettingsPanel(SETTINGS, settings, toggleSetting)
   const GAME = bonkGame(settings)
   const [best, record] = useBest(GAME)
   const { run, begin } = useRun(GAME)
@@ -197,76 +198,77 @@ export default function Bonk() {
         <Link to="/games" viewTransition>
           ← All games
         </Link>
-        <SoundToggle />
       </p>
       <h1 className="page-title">Bonk</h1>
       <p className="lede">My head pops up. You bonk it. 30 seconds, as many as you can.</p>
 
       <div className="game-layout">
-        <div className="bonk" ref={board} style={sky(left)}>
-          <div className="bonk-bar">
-            <p>
-              Score <strong>{score}</strong>
-            </p>
-            <p>
-              <strong>{Math.ceil(left / 1000)}</strong>s
-            </p>
-          </div>
-          <div className="bonk-grid">
-            {Array.from({ length: HOLES }, (_, i) => {
-              const up = ups[i]
-              return (
-                <button
-                  key={i}
-                  type="button"
-                  className={
-                    'bonk-hole' +
-                    (up ? ' up' : '') +
-                    (up?.decoy ? ' decoy' : '') +
-                    (bonked === i ? ' bonked' : '') +
-                    (oops === i ? ' oops' : '') +
-                    (missed === i ? ' missed' : '')
-                  }
-                  aria-label={up ? (up.decoy ? `Don't bonk ${NAMES[other]}!` : 'Bonk the head!') : `Hole ${i + 1}`}
-                  onPointerDown={(e) => (e.preventDefault(), bonk(i))}
-                  onClick={(e) => e.detail === 0 && bonk(i)} // keyboard (Enter or Space)
-                  disabled={phase !== 'playing'}
-                >
-                  <span
-                    className="bonk-head"
-                    style={{ ...look(up?.decoy ? other : player), ...sprite(up?.facing ?? 0) }}
-                    aria-hidden="true"
-                  />
-                  <span className="bonk-stars" aria-hidden="true">
-                    ✦ ✧ ✦
-                  </span>
-                  <span className="bonk-dust" aria-hidden="true" />
-                </button>
-              )
-            })}
-          </div>
-          {phase === 'playing' && <PauseButton onPause={pause} />}
-          {phase === 'paused' && <Paused onResume={resume} />}
-          {(phase === 'ready' || phase === 'over') && (
-            <div className="game-overlay">
-              {phase === 'over' ? (
-                <>
-                  <h2>Time!</h2>
-                  <p className="game-final" role="status">
-                    Score: <strong>{score}</strong>
-                    {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
-                  </p>
-                  <ScoreEntry game={GAME} score={score} run={run} easy={easy.current} onSaved={setScores} />
-                </>
-              ) : (
-                <h2>Ready?</h2>
-              )}
-              <button type="button" className="button" onClick={play}>
-                {phase === 'over' ? 'Play again' : 'Start'}
-              </button>
+        <div className="game-screen">
+          <GameBar>{phase === 'playing' ? <PauseButton onPause={pause} /> : phase !== 'paused' && cog}</GameBar>
+          <div className="bonk" ref={board} style={sky(left)}>
+            <div className="bonk-bar">
+              <p>
+                Score <strong>{score}</strong>
+              </p>
+              <p>
+                <strong>{Math.ceil(left / 1000)}</strong>s
+              </p>
             </div>
-          )}
-          <GameSettings options={SETTINGS} settings={settings} onToggle={toggleSetting} hidden={phase === 'playing' || phase === 'paused'} />
+            <div className="bonk-grid">
+              {Array.from({ length: HOLES }, (_, i) => {
+                const up = ups[i]
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    className={
+                      'bonk-hole' +
+                      (up ? ' up' : '') +
+                      (up?.decoy ? ' decoy' : '') +
+                      (bonked === i ? ' bonked' : '') +
+                      (oops === i ? ' oops' : '') +
+                      (missed === i ? ' missed' : '')
+                    }
+                    aria-label={up ? (up.decoy ? `Don't bonk ${NAMES[other]}!` : 'Bonk the head!') : `Hole ${i + 1}`}
+                    onPointerDown={(e) => (e.preventDefault(), bonk(i))}
+                    onClick={(e) => e.detail === 0 && bonk(i)} // keyboard (Enter or Space)
+                    disabled={phase !== 'playing'}
+                  >
+                    <span
+                      className="bonk-head"
+                      style={{ ...look(up?.decoy ? other : player), ...sprite(up?.facing ?? 0) }}
+                      aria-hidden="true"
+                    />
+                    <span className="bonk-stars" aria-hidden="true">
+                      ✦ ✧ ✦
+                    </span>
+                    <span className="bonk-dust" aria-hidden="true" />
+                  </button>
+                )
+              })}
+            </div>
+            {phase === 'paused' && <Paused onResume={resume} />}
+            {(phase === 'ready' || phase === 'over') && (
+              <div className="game-overlay">
+                {phase === 'over' ? (
+                  <>
+                    <h2>Time!</h2>
+                    <p className="game-final" role="status">
+                      Score: <strong>{score}</strong>
+                      {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
+                    </p>
+                    <ScoreEntry game={GAME} score={score} run={run} easy={easy.current} onSaved={setScores} />
+                  </>
+                ) : (
+                  <h2>Ready?</h2>
+                )}
+                <button type="button" className="button" onClick={play}>
+                  {phase === 'over' ? 'Play again' : 'Start'}
+                </button>
+              </div>
+            )}
+            {panel}
+          </div>
         </div>
         <ScoreBoard game={GAME} scores={scores} />
       </div>

@@ -29,7 +29,7 @@ export default function FullscreenToggle() {
   return (
     <button
       type="button"
-      className="fullscreen-toggle"
+      className="game-tool fullscreen-toggle"
       aria-label={on ? 'Exit full screen' : 'Full screen'}
       aria-pressed={on}
       onClick={() => setOn(!on)}

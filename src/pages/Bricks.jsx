@@ -4,9 +4,9 @@ import { HEADS } from '../lib/bounce.js'
 import { cheatOn, gameHead } from '../lib/gameHead.js'
 import { BALL, BRICK, HEIGHT, PADDLE, SAFETY_Y, SETTINGS, WIDTH, bricksGame, launch, paddleWidth, start, step } from '../lib/bricks.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
-import GameSettings, { useGameSettings } from '../components/GameSettings.jsx'
+import { useGameSettings, useSettingsPanel } from '../components/GameSettings.jsx'
 import { PauseButton, Paused, usePause } from '../components/Pause.jsx'
-import SoundToggle from '../components/SoundToggle.jsx'
+import GameBar from '../components/GameBar.jsx'
 import useWide, { WIDE_WIDTH } from '../components/useWide.js'
 import { useCheats } from '../components/Cheats.jsx'
 import { feedback } from '../lib/feedback.js'
@@ -230,6 +230,7 @@ export default function Bricks() {
   const [newBest, setNewBest] = useState(false)
   const [scores, setScores] = useState(null)
   const [settings, toggleSetting, settingsRef] = useGameSettings('bricks', SETTINGS)
+  const { cog, panel } = useSettingsPanel(SETTINGS, settings, toggleSetting)
   const GAME = bricksGame(settings)
   const [best, record] = useBest(GAME)
   const { run, begin } = useRun(GAME)
@@ -380,7 +381,6 @@ export default function Bricks() {
         <Link to="/games" viewTransition>
           ← All games
         </Link>
-        <SoundToggle />
       </p>
       <h1 className="page-title">Bricks</h1>
       <p className="lede">
@@ -389,36 +389,40 @@ export default function Bricks() {
       </p>
 
       <div className="game-layout">
-        <div
-          className={`game-stage swipe-stage${boardWide ? ' wide' : ''}`}
-          ref={stage}
-          onPointerDown={down}
-          onPointerMove={move}
-          onPointerUp={up}
-          onPointerCancel={up}
-        >
-          <canvas ref={canvas} className="game-canvas" role="img" aria-label={`Bricks. Score: ${score}`} />
-          {phase === 'ready' && (
-            <div className="game-overlay game-overlay-hint">
-              <p>Tap to start</p>
-            </div>
-          )}
-          {phase === 'over' && (
-            <div className="game-overlay" onPointerDown={(e) => e.stopPropagation()}>
-              <h2>Out of balls!</h2>
-              <p className="game-final" role="status">
-                Score: <strong>{score}</strong>
-                {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
-              </p>
-              <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy} onSaved={setScores} />
-              <button type="button" className="button" onClick={play}>
-                Play again
-              </button>
-            </div>
-          )}
-          {phase === 'playing' && <PauseButton onPause={pause} />}
-          {phase === 'paused' && <Paused onResume={resume} />}
-          <GameSettings options={SETTINGS} settings={settings} onToggle={toggleSetting} hidden={phase === 'playing' || phase === 'paused'} />
+        <div className="game-screen">
+          <GameBar>
+            {phase === 'playing' ? <PauseButton onPause={pause} /> : phase !== 'paused' && cog}
+          </GameBar>
+          <div
+            className={`game-stage swipe-stage${boardWide ? ' wide' : ''}`}
+            ref={stage}
+            onPointerDown={down}
+            onPointerMove={move}
+            onPointerUp={up}
+            onPointerCancel={up}
+          >
+            <canvas ref={canvas} className="game-canvas" role="img" aria-label={`Bricks. Score: ${score}`} />
+            {phase === 'ready' && (
+              <div className="game-overlay game-overlay-hint">
+                <p>Tap to start</p>
+              </div>
+            )}
+            {phase === 'over' && (
+              <div className="game-overlay" onPointerDown={(e) => e.stopPropagation()}>
+                <h2>Out of balls!</h2>
+                <p className="game-final" role="status">
+                  Score: <strong>{score}</strong>
+                  {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
+                </p>
+                <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy} onSaved={setScores} />
+                <button type="button" className="button" onClick={play}>
+                  Play again
+                </button>
+              </div>
+            )}
+            {phase === 'paused' && <Paused onResume={resume} />}
+            {panel}
+          </div>
         </div>
         <ScoreBoard game={GAME} scores={scores} />
       </div>

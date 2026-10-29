@@ -1,13 +1,8 @@
 import { useEffect, useState } from 'react'
 import { setSoundOn, soundOn } from '../lib/feedback.js'
-import { useCheats } from './Cheats.jsx'
-import FullscreenToggle from './Fullscreen.jsx'
 
-// Switches the games' sound effects on or off (lib/feedback.js), for every game, remembered. Beside
-// it, a badge while the secret Easy Mode cheat is on, and the full screen button
-// (components/Fullscreen.jsx).
+// Switches the games' sound effects on or off (lib/feedback.js), for every game, remembered
 export default function SoundToggle() {
-  const easy = useCheats().isOn('easy')
   // On to start with, like the prerendered page; the saved choice loads after mount
   const [on, setOn] = useState(true)
   useEffect(() => setOn(soundOn()), [])
@@ -16,12 +11,11 @@ export default function SoundToggle() {
     setOn(!on)
   }
   return (
-    <span className="game-tools">
-      {easy && <span className="easy-badge">Easy mode</span>}
-      <FullscreenToggle />
-      <button type="button" className="sound-toggle" aria-pressed={on} onClick={toggle}>
-        <span aria-hidden="true">{on ? '🔊' : '🔇'}</span> Sound
-      </button>
-    </span>
+    <button type="button" className="game-tool sound-toggle" aria-label="Sound" aria-pressed={on} onClick={toggle}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" />
+        {on ? <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" />}
+      </svg>
+    </button>
   )
 }

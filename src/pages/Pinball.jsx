@@ -22,7 +22,7 @@ import {
 	useBest,
 	useRun,
 } from "../components/Scores.jsx";
-import SoundToggle from "../components/SoundToggle.jsx";
+import GameBar from "../components/GameBar.jsx";
 import { PauseButton, Paused, usePause } from "../components/Pause.jsx";
 import { feedback } from "../lib/feedback.js";
 import { useCheats } from "../components/Cheats.jsx";
@@ -499,7 +499,6 @@ export default function Pinball() {
 				<Link to="/games" viewTransition>
 					← All games
 				</Link>
-				<SoundToggle />
 			</p>
 			<h1 className="page-title">Pinball</h1>
 			<p className="lede">
@@ -527,18 +526,25 @@ export default function Pinball() {
 			</div>
 
 			<div className="game-layout">
-				<div>
-					<p className="pinball-hud" aria-live="polite">
-						<span>
-							Score <strong>{hud.score.toLocaleString()}</strong>
-						</span>
-						{hud.multiplier > 1 && (
-							<span className="pinball-multiplier">×{hud.multiplier}</span>
-						)}
-						<span>
-							Ball <strong>{ball}</strong> of {total}
-						</span>
-					</p>
+				<div className="game-screen">
+					{/* The score and ball in the bar, beside its buttons */}
+					<GameBar
+						info={
+							<p className="pinball-hud" aria-live="polite">
+								<span>
+									Score <strong>{hud.score.toLocaleString()}</strong>
+								</span>
+								{hud.multiplier > 1 && (
+									<span className="pinball-multiplier">×{hud.multiplier}</span>
+								)}
+								<span>
+									Ball <strong>{ball}</strong> of {total}
+								</span>
+							</p>
+						}
+					>
+						{phase === "playing" && <PauseButton onPause={pause} />}
+					</GameBar>
 					<div
 						className="game-stage pinball-stage"
 						ref={stage}
@@ -562,7 +568,6 @@ export default function Pinball() {
 								</p>
 							</div>
 						)}
-						{phase === "playing" && <PauseButton onPause={pause} />}
 						{phase === "paused" && <Paused onResume={resume} />}
 						{phase === "over" && (
 							<div

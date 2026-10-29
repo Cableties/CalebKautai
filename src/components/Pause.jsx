@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-// Pausing the games: a button in the corner while one's being played, P or Escape on a keyboard,
+// Pausing the games: a button above the game (components/GameBar.jsx) while one's being played, P or Escape on a keyboard,
 // and switching to another tab or app. A paused game shows "Paused" over it and carries on where it
 // left off. The game's own loop just doesn't move on while its phase is 'paused'.
 
@@ -41,12 +41,12 @@ export function usePause(phaseRef, setPhase, { onPause, onResume } = {}) {
   return { pause, resume }
 }
 
-// Taps on these stay on them, so they don't flap, steer or fire in the game underneath
+// Taps on the overlay stay on it, so they don't flap, steer or fire in the game underneath
 const keep = (e) => e.stopPropagation()
 
 export function PauseButton({ onPause }) {
   return (
-    <button type="button" className="game-pause" aria-label="Pause" onPointerDown={keep} onClick={onPause}>
+    <button type="button" className="game-tool game-pause" aria-label="Pause" onClick={onPause}>
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <rect x="6" y="5" width="4" height="14" rx="1" />
         <rect x="14" y="5" width="4" height="14" rx="1" />

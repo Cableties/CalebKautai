@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
-// A game's settings: a cog in the corner of the game (while it isn't being played) that opens a
-// panel of switches over it. The options (id, name, note) live with each game's rules, since the
+// A game's settings: a cog above the game (while it isn't being played) that opens a panel of
+// switches over it. The options (id, name, note) live with each game's rules, since the
 // scores API needs them too (lib/settings.js).
 
 // The settings themselves, remembered in this browser. Returns [settings, toggle(id), ref], the ref
@@ -42,59 +42,57 @@ const COG = (
   </svg>
 )
 
-// `hidden` while a game's being played. Taps and keys in here stay here, so they don't start or
-// steer the game underneath.
-export default function GameSettings({ options, settings, onToggle, hidden }) {
+// The cog and its panel, as two parts: the cog goes in the bar above the game (components/GameBar.jsx),
+// out of the way, and the panel opens over the game. Returns { cog, panel }, for the page to put
+// where they go (the cog only while the game isn't being played).
+export function useSettingsPanel(options, settings, onToggle) {
   const [open, setOpen] = useState(false)
   const done = useRef(null)
   useEffect(() => {
     if (open) done.current?.focus()
   }, [open])
-  if (hidden) return null
+  // Taps and keys in the panel stay there, so they don't start or steer the game underneath
   const keep = (e) => {
     e.stopPropagation()
     if (e.key === 'Escape') setOpen(false)
   }
   const on = options.filter((o) => settings[o.id]).length
-  return (
-    <>
-      <button
-        type="button"
-        className="game-cog"
-        aria-label={on ? `Settings (${on} on)` : 'Settings'}
-        aria-expanded={open}
-        onPointerDown={keep}
-        onKeyDown={keep}
-        onClick={() => setOpen(true)}
-      >
-        {COG}
-        {on > 0 && <span className="game-cog-count">{on}</span>}
-      </button>
-      {open && (
-        <div className="game-settings-panel" role="dialog" aria-label="Settings" onPointerDown={keep} onKeyDown={keep}>
-          <h2>Settings</h2>
-          <ul>
-            {options.map((o) => (
-              <li key={o.id}>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={settings[o.id]}
-                  className="game-setting"
-                  onClick={() => onToggle(o.id)}
-                >
-                  <span className="game-setting-name">{o.name}</span>
-                  <span className="game-setting-note">{o.note}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-          <p className="game-settings-boards">Each mix of settings has its own high scores.</p>
-          <button type="button" className="button" ref={done} onClick={() => setOpen(false)}>
-            Done
-          </button>
-        </div>
-      )}
-    </>
+  const cog = (
+    <button
+      type="button"
+      className="game-tool game-cog"
+      aria-label={on ? `Settings (${on} on)` : 'Settings'}
+      aria-expanded={open}
+      onClick={() => setOpen(true)}
+    >
+      {COG}
+      {on > 0 && <span className="game-cog-count">{on}</span>}
+    </button>
   )
+  const panel = open && (
+    <div className="game-settings-panel" role="dialog" aria-label="Settings" onPointerDown={keep} onKeyDown={keep}>
+      <h2>Settings</h2>
+      <ul>
+        {options.map((o) => (
+          <li key={o.id}>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={settings[o.id]}
+              className="game-setting"
+              onClick={() => onToggle(o.id)}
+            >
+              <span className="game-setting-name">{o.name}</span>
+              <span className="game-setting-note">{o.note}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="game-settings-boards">Each mix of settings has its own high scores.</p>
+      <button type="button" className="button" ref={done} onClick={() => setOpen(false)}>
+        Done
+      </button>
+    </div>
+  )
+  return { cog, panel }
 }
