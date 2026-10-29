@@ -3606,6 +3606,88 @@ a {
   font-weight: 600;
   text-decoration: none;
 }
+/* Full screen (components/Fullscreen.jsx): a button for touch screens, and the game page taking
+   over the screen, the board as big as fits under the button bar */
+.fullscreen-toggle {
+  display: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.fullscreen-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (pointer: coarse) {
+  .fullscreen-toggle {
+    display: grid;
+  }
+}
+:root[data-game-fullscreen] .fullscreen-toggle {
+  display: grid;
+}
+:root[data-game-fullscreen],
+:root[data-game-fullscreen] body {
+  overflow: hidden;
+}
+:root[data-game-fullscreen] .game-page {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  margin: 0;
+  padding: calc(6px + env(safe-area-inset-top)) calc(8px + env(safe-area-inset-right))
+    calc(8px + env(safe-area-inset-bottom)) calc(8px + env(safe-area-inset-left));
+  background: var(--paper);
+}
+/* Just the buttons and the game: no title, blurb, way back or high scores (or pinball's tables) */
+:root[data-game-fullscreen] .game-page > :not(.game-back, .game-layout),
+:root[data-game-fullscreen] .game-back a,
+:root[data-game-fullscreen] .game-layout > :not(:first-child) {
+  display: none;
+}
+:root[data-game-fullscreen] .game-back {
+  justify-content: flex-end;
+  margin: 0 0 6px;
+}
+/* The space left, which the board's sized to (in cq units, the layout being its container) */
+:root[data-game-fullscreen] .game-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  place-items: center;
+  margin: 0;
+  container-type: size;
+}
+:root[data-game-fullscreen] .game-stage {
+  width: min(100cqw, 100cqh * 9 / 16);
+  max-width: none;
+}
+:root[data-game-fullscreen] .game-stage.wide {
+  width: min(100cqw, 100cqh * 21 / 16);
+}
+/* Pinball's score line sits on top of the table */
+:root[data-game-fullscreen] :is(.pinball-stage, .pinball-hud) {
+  width: min(100cqw, (100cqh - 38px) * 9 / 16);
+}
+/* Bonk's board is about square, plus its score bar */
+:root[data-game-fullscreen] .bonk {
+  width: min(100cqw, 100cqh - 60px);
+}
 .game-layout {
   display: grid;
   grid-template-columns: minmax(0, auto) minmax(200px, 260px);

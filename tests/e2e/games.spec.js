@@ -580,3 +580,30 @@ test.describe("tap feedback", () => {
 		);
 	});
 });
+
+test.describe("Full screen", () => {
+	for (const game of ["flappy-head", "bonk", "pinball"]) {
+		test(`on a phone, ${game} fills the screen and comes back`, async ({ page, isMobile }) => {
+			// The button's only on touch screens
+			test.skip(!isMobile, "phones only");
+			await page.goto(`/games/${game}`);
+			await page.getByRole("button", { name: "Full screen" }).click();
+			await expect(page.locator(".page-title")).toBeHidden();
+			await expect(page.locator(".scoreboard")).toBeHidden();
+			const board = page.locator(".game-stage, .bonk").first();
+			const box = await board.boundingBox();
+			const screen = page.viewportSize();
+			// As big as fits: the whole width, or (a short screen) the whole height
+			expect(box.width > screen.width * 0.9 || box.height > screen.height * 0.8).toBe(true);
+			expect(box.y + box.height).toBeLessThanOrEqual(screen.height + 1);
+			await page.getByRole("button", { name: "Exit full screen" }).click();
+			await expect(page.locator(".page-title")).toBeVisible();
+		});
+	}
+
+	test("the button stays out of the way on a desktop", async ({ page, isMobile }) => {
+		test.skip(isMobile, "desktops only");
+		await page.goto("/games/snake");
+		await expect(page.getByRole("button", { name: "Full screen" })).toBeHidden();
+	});
+});
