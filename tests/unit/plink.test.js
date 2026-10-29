@@ -203,3 +203,24 @@ test('plink: trick shots: a long shot, a bank shot and a gold combo each add one
   assert.equal(s.score, 25 + 50 + 50 + 50 * 2)
   assert.equal(plink.multiplier(s), 2)
 })
+
+test('plink: aiming through a point (the mouse), the ball drops right through it, on either board, unless it is out of reach', () => {
+  for (const width of [plink.WIDTH, 840]) {
+    for (const [fx, y] of [[0.1, 300], [0.9, 160], [0.3, 550], [0.55, 400], [0.02, 120], [0.98, 600]]) {
+      const x = fx * width
+      let s = plink.start({ width, nobucket: true }, first)
+      s.pegs = [{ x: 5, y: 5, kind: 'gold', lit: false, gone: false, sway: 0 }] // out of the way
+      s = plink.fire(plink.aimThrough(s, x, y))
+      let closest = Infinity
+      for (let i = 0; i < 2400 && s.inPlay.length; i++) {
+        const [b] = s.inPlay
+        closest = Math.min(closest, Math.hypot(b.x - x, b.y - y))
+        s = plink.step(s, 1 / 240, {}, first)
+      }
+      assert.ok(closest < 4, `${width}: (${x}, ${y}) missed by ${closest.toFixed(1)}`)
+    }
+  }
+  // Too far off to the side and up for the arc: as near as it gets, still heading that way
+  const s = plink.aimThrough(plink.start({ width: 840 }, first), 830, 50)
+  assert.ok(s.aim > 1.5)
+})

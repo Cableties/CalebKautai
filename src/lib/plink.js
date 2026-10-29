@@ -201,11 +201,30 @@ export function aimAt(state, x, y) {
 // Turn the aim by `by` radians (a finger dragging), within the limits
 export const turn = (state, by) => ({ ...state, aim: Math.max(-AIM.max, Math.min(AIM.max, state.aim + by)) })
 
+const speed = (s) => LAUNCH * (s.width > WIDTH ? WIDE_LAUNCH : 1)
+
+// Aim so the ball's arc, dropping as it goes, passes through a point (the mouse): the more direct of
+// the two arcs that do, or if it's out of reach, the one that gets furthest towards it. (Through
+// open air: whatever's in the way, it'll hit first.)
+export function aimThrough(state, x, y) {
+  const across = x - launcherX(state)
+  const down = y - LAUNCHER.y
+  const reach = Math.abs(across)
+  if (reach < 1) return { ...state, aim: 0 }
+  // With u the tangent of the angle above level: down = a·u² − reach·u + a, where a is how far it'd
+  // drop over that distance fired level
+  const a = (GRAVITY * reach * reach) / (2 * speed(state) ** 2)
+  const room = reach * reach - 4 * a * (a - down)
+  const u = room >= 0 ? (reach - Math.sqrt(room)) / (2 * a) : reach / (2 * a)
+  const up = Math.atan(u)
+  return turn({ ...state, aim: 0 }, Math.atan2(Math.sign(across) * Math.cos(up), -Math.sin(up)))
+}
+
 const launch = (s) => ({
   x: launcherX(s),
   y: LAUNCHER.y,
-  vx: Math.sin(s.aim) * LAUNCH * (s.width > WIDTH ? WIDE_LAUNCH : 1),
-  vy: Math.cos(s.aim) * LAUNCH * (s.width > WIDTH ? WIDE_LAUNCH : 1),
+  vx: Math.sin(s.aim) * speed(s),
+  vy: Math.cos(s.aim) * speed(s),
   ax: launcherX(s),
   ay: LAUNCHER.y,
   still: 0,

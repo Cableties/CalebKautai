@@ -11,7 +11,7 @@ import {
   PEG_R,
   SETTINGS,
   WIDTH,
-  aimAt,
+  aimThrough,
   aimed,
   bucketWidth,
   bucketX,
@@ -34,8 +34,8 @@ import { feedback } from '../lib/feedback.js'
 import { approach, themeAt } from '../lib/themes.js'
 
 // Plink: fire my head down into a board of pegs, and clear the gold ones. The rules are in
-// lib/plink.js; this draws them on a canvas and handles input: point the mouse to aim and click to
-// fire, drag a finger side to side to aim and let go to fire, or the arrow keys and Space. Settings
+// lib/plink.js; this draws them on a canvas and handles input: point the mouse where the ball should
+// go and click to fire, drag a finger side to side to aim and let go to fire, or the arrow keys and Space. Settings
 // are behind the cog, and each mix has its own high scores. Super Aim's a hidden cheat: tap the
 // score three times, and the aiming guide shows the path through two pegs, from then on in this
 // browser (three more taps to switch it off). It still counts for the high scores.
@@ -583,12 +583,12 @@ export default function Plink() {
     stage.current.setPointerCapture(e.pointerId)
     aiming.current = true
     dragX.current = e.clientX
-    if (e.pointerType === 'mouse') game.current = aimAt(game.current, ...at(e))
+    if (e.pointerType === 'mouse') game.current = aimThrough(game.current, ...at(e))
   }
   function move(e) {
     if (phaseRef.current !== 'playing') return
-    // A mouse aims where it points, just by moving over it
-    if (e.pointerType === 'mouse') return void (game.current = aimAt(game.current, ...at(e)))
+    // A mouse aims so the ball goes through where it points, just by moving over it
+    if (e.pointerType === 'mouse') return void (game.current = aimThrough(game.current, ...at(e)))
     // A finger turns the aim as it drags side to side, from wherever it went down, so small moves
     // are fine adjustments and it isn't covering where it's aiming (Australia Mode's upside down)
     if (!aiming.current) return
@@ -635,7 +635,7 @@ export default function Plink() {
       </p>
       <h1 className="page-title">Plink</h1>
       <p className="lede">
-        Drag your finger side to side to aim (or point the mouse, or the arrow keys), and let go to fire my head into the pegs. Hit every gold one to clear the
+        Drag your finger side to side to aim (or point the mouse where you want it to go, or use the arrow keys), and let go to fire my head into the pegs. Hit every gold one to clear the
         level. Land in the bucket for a free ball. Green pegs are power-ups. Combos, long shots and bank shots multiply your points.
       </p>
 
