@@ -22,9 +22,12 @@ export const LAUNCHER = { y: HUD + 30 }
 const SUB = 1 / 240 // seconds per step
 const GRAVITY = 620
 const LAUNCH = 470
+const WIDE_LAUNCH = 1.3 // times as fast on a wide board, to reach its far top corners
 const MAX_SPEED = 900
 const BOUNCE = { peg: 0.72, wall: 0.85 }
-const AIM = { max: 1.45, turn: 1.4 } // radians either side of straight down; radians per second with keys
+// Radians either side of straight down (a little past level, for the top corners); radians per
+// second with keys
+const AIM = { max: 1.85, turn: 1.4 }
 export const BUCKET = { y: HEIGHT - 22, width: 76, big: 124, rim: 6, speed: 0.7 }
 const BALLS = { normal: 10, wide: 12, easy: 3 } // a level's balls (and Easy Mode's extra)
 const STILL = { distance: 18, seconds: 1.5 } // a ball that hasn't got this far in this long is stuck
@@ -145,10 +148,16 @@ function level(s, random) {
 }
 
 // `width`: the screen's width (wider on a desktop)
-export function start({ easy = false, nopowers = false, nobucket = false, moving = false, width = WIDTH } = {}, random = Math.random) {
+// `superAim`: the aiming guide's longest, switched on and off mid-game (it doesn't get its own high
+// scores)
+export function start(
+  { easy = false, nopowers = false, nobucket = false, moving = false, superAim = false, width = WIDTH } = {},
+  random = Math.random,
+) {
   const s = {
     width,
     easy,
+    superAim,
     moving,
     powers: !nopowers,
     bucket: !nobucket,
@@ -183,11 +192,14 @@ export function aimAt(state, x, y) {
   return { ...state, aim: Math.max(-AIM.max, Math.min(AIM.max, angle)) }
 }
 
+// Turn the aim by `by` radians (a finger dragging), within the limits
+export const turn = (state, by) => ({ ...state, aim: Math.max(-AIM.max, Math.min(AIM.max, state.aim + by)) })
+
 const launch = (s) => ({
   x: launcherX(s),
   y: LAUNCHER.y,
-  vx: Math.sin(s.aim) * LAUNCH,
-  vy: Math.cos(s.aim) * LAUNCH,
+  vx: Math.sin(s.aim) * LAUNCH * (s.width > WIDTH ? WIDE_LAUNCH : 1),
+  vy: Math.cos(s.aim) * LAUNCH * (s.width > WIDTH ? WIDE_LAUNCH : 1),
   ax: launcherX(s),
   ay: LAUNCHER.y,
   still: 0,
@@ -261,10 +273,10 @@ function move(s, ball, clock, hit) {
 }
 
 // Where a shot fired now would go, for the aiming guide: its path, up to its first peg (or third,
-// with the long guide; second in Easy Mode), and where it touches that one (`contact`, or null if it
+// with the long guide; second in Easy Mode; fifth with Super Aim, the page's hidden cheat), and where it touches that one (`contact`, or null if it
 // touches none), and which peg (`peg`, its index)
 export function aimed(state) {
-  const hits = state.longAim > 0 ? 3 : state.easy ? 2 : 1
+  const hits = state.superAim ? 5 : state.longAim > 0 ? 3 : state.easy ? 2 : 1
   const ball = launch(state)
   const points = [[ball.x, ball.y]]
   let clock = state.clock

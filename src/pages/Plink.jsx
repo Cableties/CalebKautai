@@ -21,6 +21,7 @@ import {
   plinkGame,
   start,
   step,
+  turn,
 } from '../lib/plink.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
 import { useGameSettings, useSettingsPanel } from '../components/GameSettings.jsx'
@@ -32,22 +33,48 @@ import { feedback } from '../lib/feedback.js'
 import { approach, themeAt } from '../lib/themes.js'
 
 // Plink: fire my head down into a board of pegs, and clear the gold ones. The rules are in
-// lib/plink.js; this draws them on a canvas and handles input: point (or drag a finger) to aim and
-// let go to fire, or the arrow keys and Space. Settings are behind the cog, and each mix has its
-// own high scores.
+// lib/plink.js; this draws them on a canvas and handles input: point the mouse to aim and click to
+// fire, drag a finger side to side to aim and let go to fire, or the arrow keys and Space. Settings are behind the cog, and each mix has its
+// own high scores. Super Aim's a hidden cheat: tap the score three times, and the aiming guide shows
+// the path through five pegs, from then on in this browser (three more taps to switch it off). It
+// still counts for the high scores.
 const LEFT_KEYS = ['ArrowLeft', 'a', 'A']
 const RIGHT_KEYS = ['ArrowRight', 'd', 'D']
 const FIRE_KEYS = [' ', 'ArrowDown', 's', 'S', 'Enter']
 const INK = '#2e2a45'
+const SUPER = { taps: 3, window: 1500, key: 'plink-superaim' } // taps on the score, within ms
+const SCORE_BOX = { width: 120 } // where the score is, in the strip at the top
+const DRAG = 0.012 // radians the aim turns per pixel a finger drags (a 100px drag: about 70°)
 const PEGS = { gold: '#f5b937', power: '#5cc97a', bonus: '#f05d8a' } // plain ones are the level's colour
-// Each level its own look, going round: lilac, sea, sunset, mint, night. `peg`: the plain pegs.
+// Each level its own scene, going round, fading from one to the next. `peg`: the plain pegs; `dots`:
+// the aim and writing on the board; `far` and `near`: the hills along the bottom. The numbers fade
+// each scene's bits in and out: clouds, bubbles rising, rays of light, a low sun, petals falling,
+// stars and the moon.
 const LEVELS = [
-  { top: '#e6defa', bottom: '#cfe6f7', peg: '#8f7fd6', dots: '#2e2a45', glow: 0 },
-  { top: '#bfe6f2', bottom: '#7cc0df', peg: '#3f7fb3', dots: '#16365a', glow: 0 },
-  { top: '#ffe0c4', bottom: '#f7b6cf', peg: '#c56a8c', dots: '#2e2a45', glow: 0 },
-  { top: '#e3f6e9', bottom: '#fdf2c2', peg: '#4f9f74', dots: '#2e2a45', glow: 0 },
-  { top: '#2f2a63', bottom: '#4c3f8a', peg: '#9d93e0', dots: '#ffffff', glow: 1 },
+  {
+    top: '#e6defa', bottom: '#cfe6f7', peg: '#8f7fd6', dots: '#2e2a45', far: '#d6cdf5', near: '#b9a9e8',
+    clouds: 1, rising: 0, rays: 0, sun: 0, petals: 0, stars: 0,
+  },
+  {
+    top: '#bfe6f2', bottom: '#5fa9d3', peg: '#3f7fb3', dots: '#16365a', far: '#4f97c4', near: '#ecd9a4',
+    clouds: 0, rising: 1, rays: 1, sun: 0, petals: 0, stars: 0,
+  },
+  {
+    top: '#ffd9b8', bottom: '#f7a8c4', peg: '#8e4f9e', dots: '#2e2a45', far: '#d77fa0', near: '#8f4a78',
+    clouds: 0.5, rising: 0, rays: 0, sun: 1, petals: 0, stars: 0,
+  },
+  {
+    top: '#dff4ff', bottom: '#fdf2c2', peg: '#5b8fd6', dots: '#2e2a45', far: '#b5e3bf', near: '#7cc58f',
+    clouds: 0.6, rising: 0, rays: 0, sun: 0, petals: 1, stars: 0,
+  },
+  {
+    top: '#1f1b4d', bottom: '#4c3f8a', peg: '#9d93e0', dots: '#ffffff', far: '#2c2766', near: '#16133a',
+    clouds: 0, rising: 0, rays: 0, sun: 0, petals: 0, stars: 1,
+  },
 ]
+const NAMES = ['Lavender sky', 'Under the sea', 'Sunset', 'Spring meadow', 'Starry night']
+const TITLE_SECONDS = 2.2 // a level's name, as it starts
+const noise = (i, n) => Math.abs(Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1
 const lighter = (hex) => `#${[1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * 0.4 + 255 * 0.6).toString(16).padStart(2, '0')).join('')}`
 
 function peg(ctx, x, y, colour, lit, time) {
@@ -88,22 +115,117 @@ function mark(ctx, kind, x, y) {
   }
 }
 
+// A row of rolling hills along the bottom
+function hills(ctx, W, colour, base, height, wave, shift) {
+  ctx.fillStyle = colour
+  ctx.beginPath()
+  ctx.moveTo(0, HEIGHT)
+  for (let x = 0; x <= W + 10; x += 10) ctx.lineTo(x, base - height * (0.5 + 0.5 * Math.sin(x / wave + shift)))
+  ctx.lineTo(W, HEIGHT)
+  ctx.closePath()
+  ctx.fill()
+}
+
+// The level's scene, behind the pegs
 function backdrop(ctx, W, theme, time) {
   const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT)
   sky.addColorStop(0, theme.top)
   sky.addColorStop(1, theme.bottom)
   ctx.fillStyle = sky
   ctx.fillRect(0, 0, W, HEIGHT)
-  // The night's stars
-  if (theme.glow > 0) {
-    ctx.fillStyle = '#fff'
-    for (let i = 0; i < 40; i++) {
-      const n = (k) => Math.abs(Math.sin(i * 12.9898 + k * 78.233) * 43758.5453) % 1
-      ctx.globalAlpha = theme.glow * (0.4 + 0.4 * Math.sin(time * 2 + i))
-      ctx.fillRect(n(1) * W, HUD + n(2) * (HEIGHT - HUD), 2, 2)
-    }
-    ctx.globalAlpha = 1
+
+  // A low sun, glowing, half behind the hills
+  if (theme.sun > 0) {
+    const glow = ctx.createRadialGradient(W / 2, HEIGHT - 80, 30, W / 2, HEIGHT - 80, 260)
+    glow.addColorStop(0, `rgb(255 236 170 / ${0.7 * theme.sun})`)
+    glow.addColorStop(1, 'rgb(255 236 170 / 0)')
+    ctx.fillStyle = glow
+    ctx.fillRect(0, 0, W, HEIGHT)
+    ctx.globalAlpha = theme.sun
+    ctx.fillStyle = '#ffe08a'
+    ctx.beginPath()
+    ctx.arc(W / 2, HEIGHT - 80, 90, 0, Math.PI * 2)
+    ctx.fill()
   }
+  // Stars twinkling, and a crescent moon
+  if (theme.stars > 0) {
+    ctx.fillStyle = '#fff'
+    for (let i = 0; i < 25 + W / 10; i++) {
+      ctx.globalAlpha = theme.stars * (0.35 + 0.35 * Math.sin(time * 2 + i * 1.7))
+      const size = noise(i, 3) < 0.15 ? 3 : 2
+      ctx.fillRect(noise(i, 1) * W, HUD + noise(i, 2) * (HEIGHT - HUD - 80), size, size)
+    }
+    ctx.globalAlpha = theme.stars
+    // The moon, with a bite out of it (everywhere but a circle just off it)
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(0, 0, W, HEIGHT)
+    ctx.arc(W - 48, HUD + 62, 24, 0, Math.PI * 2)
+    ctx.clip('evenodd')
+    ctx.fillStyle = '#fff3c4'
+    ctx.beginPath()
+    ctx.arc(W - 60, HUD + 70, 26, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+  // Rays of light down through the water, swaying
+  if (theme.rays > 0) {
+    ctx.fillStyle = '#ffffff'
+    for (let i = 0; i < Math.ceil(W / 120); i++) {
+      const x = i * 120 + 40 + Math.sin(time * 0.4 + i) * 30
+      ctx.globalAlpha = theme.rays * (0.1 + 0.05 * Math.sin(time * 0.7 + i * 2))
+      ctx.beginPath()
+      ctx.moveTo(x, HUD)
+      ctx.lineTo(x + 40, HUD)
+      ctx.lineTo(x + 130, HEIGHT)
+      ctx.lineTo(x + 60, HEIGHT)
+      ctx.closePath()
+      ctx.fill()
+    }
+  }
+  for (let i = 0; i < 30; i++) {
+    const x = noise(i, 1) * W
+    // Little bubbles rising, swaying as they go
+    if (theme.rising > 0) {
+      const y = HEIGHT - ((time * (20 + noise(i, 3) * 30) + noise(i, 4) * HEIGHT) % (HEIGHT - HUD))
+      ctx.globalAlpha = theme.rising * 0.5
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.arc(x + Math.sin(time * 2 + i) * 6, y, 2 + noise(i, 5) * 4, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+    // Petals drifting down, turning as they fall
+    if (theme.petals > 0 && i < 22) {
+      const y = HUD + ((time * (18 + noise(i, 3) * 20) + noise(i, 4) * HEIGHT) % (HEIGHT - HUD))
+      ctx.globalAlpha = theme.petals * 0.8
+      ctx.fillStyle = i % 3 ? '#f7b6cf' : '#ffffff'
+      ctx.save()
+      ctx.translate(x + Math.sin(time + i) * 20, y)
+      ctx.rotate(time * (1 + noise(i, 6)) + i)
+      ctx.beginPath()
+      ctx.ellipse(0, 0, 4.5, 2.5, 0, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+    }
+    // Clouds drifting across
+    if (theme.clouds > 0 && i < Math.ceil(W / 70)) {
+      const cx = ((x + time * (6 + noise(i, 7) * 6)) % (W + 120)) - 60
+      const cy = HUD + 40 + noise(i, 6) * 260
+      ctx.globalAlpha = theme.clouds * 0.55
+      ctx.fillStyle = '#ffffff'
+      for (const [dx, dy, r] of [[0, 0, 24], [22, 6, 18], [-22, 7, 16]]) {
+        ctx.beginPath()
+        ctx.arc(cx + dx, cy + dy, r, 0, Math.PI * 2)
+        ctx.fill()
+      }
+    }
+  }
+  ctx.globalAlpha = 1
+
+  // The hills (or the seabed), far and near
+  hills(ctx, W, theme.far, HEIGHT - 52, 34, 70, 1)
+  hills(ctx, W, theme.near, HEIGHT - 18, 22, 45, 3)
 }
 
 function ball(ctx, looks, head, x, y, facing, time) {
@@ -119,7 +241,8 @@ function ball(ctx, looks, head, x, y, facing, time) {
 }
 
 // `level`: which level's look, fading from one to the next as each is cleared
-function draw(ctx, game, head, looks, time, level) {
+// `since`: seconds since this level started, for its name
+function draw(ctx, game, head, looks, time, level, since) {
   const W = game.width
   const theme = themeAt(LEVELS, level).palette
   backdrop(ctx, W, theme, time)
@@ -151,15 +274,22 @@ function draw(ctx, game, head, looks, time, level) {
     peg(ctx, x, p.y, PEGS[p.kind] ?? theme.peg, p.lit, time)
     if (p.kind === 'power' || p.kind === 'bonus') mark(ctx, p.kind, x, p.y)
   }
-  // Gone ones burst into a ring
-  for (const p of game.pops) {
+  // Gone ones burst into a ring, and sparks flying out
+  game.pops.forEach((p, n) => {
+    const colour = PEGS[p.kind] ?? theme.peg
     ctx.globalAlpha = 1 - p.age / 0.35
-    ctx.strokeStyle = PEGS[p.kind] ?? theme.peg
+    ctx.strokeStyle = colour
     ctx.lineWidth = 2.5
     ctx.beginPath()
     ctx.arc(p.x, p.y, PEG_R * (1 + p.age * 5), 0, Math.PI * 2)
     ctx.stroke()
-  }
+    ctx.fillStyle = colour
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + n
+      const r = PEG_R + p.age * 110
+      ctx.fillRect(p.x + Math.cos(a) * r - 1.5, p.y + Math.sin(a) * r - 1.5 + p.age * p.age * 200, 3, 3)
+    }
+  })
   ctx.globalAlpha = 1
 
   // The bucket, sliding along the bottom
@@ -218,6 +348,20 @@ function draw(ctx, game, head, looks, time, level) {
   }
   ctx.globalAlpha = 1
 
+  // The level's name as it starts, fading out
+  if (since < TITLE_SECONDS && !game.over) {
+    ctx.globalAlpha = Math.min(1, (TITLE_SECONDS - since) * 2, since * 4)
+    ctx.font = '800 28px system-ui, sans-serif'
+    ctx.textAlign = 'center'
+    ctx.lineWidth = 6
+    ctx.strokeStyle = INK
+    const name = NAMES[(game.level - 1) % NAMES.length]
+    ctx.strokeText(name, W / 2, HEIGHT * 0.42)
+    ctx.fillStyle = '#fff'
+    ctx.fillText(name, W / 2, HEIGHT * 0.42)
+    ctx.globalAlpha = 1
+  }
+
   // The score strip: score, level and gold left, balls left
   ctx.fillStyle = INK
   ctx.fillRect(0, 0, W, HUD)
@@ -238,7 +382,7 @@ function draw(ctx, game, head, looks, time, level) {
   ctx.fillText(`${game.balls} ${game.balls === 1 ? 'ball' : 'balls'}`, W - 14, HUD / 2 + 1)
   // On a narrow board the gold left goes under the strip, beside the launcher
   if (W <= WIDTH) {
-    ctx.fillStyle = INK
+    ctx.fillStyle = theme.dots
     ctx.textAlign = 'left'
     ctx.font = '700 13px system-ui, sans-serif'
     ctx.fillText(`${golds} gold left`, 12, HUD + 16)
@@ -260,6 +404,9 @@ export default function Plink() {
   const game = useRef(null)
   const input = useRef({})
   const aiming = useRef(false) // a finger's down, aiming: it fires when it lets go
+  const dragX = useRef(0) // where the finger was, last time it turned the aim
+  const superAim = useRef(false)
+  const taps = useRef([]) // recent taps on the score
   const head = useRef(null)
   const looks = useRef([]) // one per ball, for each one's trail
   const { player } = useCheats()
@@ -275,6 +422,7 @@ export default function Plink() {
   const [settings, toggleSetting, settingsRef] = useGameSettings('plink', SETTINGS)
   const { cog, panel } = useSettingsPanel(SETTINGS, settings, toggleSetting)
   const level = useRef(0) // the level whose look is showing (lib/themes.js), fading to the next
+  const started = useRef({ level: 0, at: 0 }) // which level's name was shown, and when (seconds)
   const GAME = plinkGame(settings)
   const [best, record] = useBest(GAME)
   const { run, begin } = useRun(GAME)
@@ -295,7 +443,39 @@ export default function Plink() {
 
   const fresh = () => {
     setBoardWide(wideRef.current)
-    return start({ ...settingsRef.current, easy: cheatOn('easy'), width: wideRef.current ? WIDE_WIDTH : WIDTH })
+    return start({
+      ...settingsRef.current,
+      easy: cheatOn('easy'),
+      superAim: superAim.current,
+      width: wideRef.current ? WIDE_WIDTH : WIDTH,
+    })
+  }
+
+  // Super Aim, as it was left in this browser
+  useEffect(() => {
+    try {
+      superAim.current = localStorage.getItem(SUPER.key) === 'on'
+      if (game.current) game.current = { ...game.current, superAim: superAim.current }
+    } catch {
+      // Storage blocked: off, then
+    }
+  }, [])
+  // A tap on the score: the third in a row switches Super Aim on or off, there and then
+  function tapScore() {
+    const now = Date.now()
+    taps.current = [...taps.current, now].filter((t) => now - t <= SUPER.window)
+    if (taps.current.length < SUPER.taps) return
+    taps.current = []
+    superAim.current = !superAim.current
+    try {
+      localStorage.setItem(SUPER.key, superAim.current ? 'on' : 'off')
+    } catch {
+      // Not remembered, then
+    }
+    const g = game.current
+    const label = { x: g.width / 2, y: HEIGHT / 2, text: superAim.current ? 'Super aim!' : 'Super aim off', age: 0 }
+    game.current = { ...g, superAim: superAim.current, labels: [...g.labels, label] }
+    feedback(superAim.current ? 'bonus' : 'whiff')
   }
 
   // New settings (or the saved ones, once they load), or a different shaped window: a fresh board
@@ -348,7 +528,10 @@ export default function Plink() {
       }
       ctx.setTransform(el.width / game.current.width, 0, 0, el.height / HEIGHT, 0, 0)
       level.current = approach(level.current, game.current.level - 1, dt)
-      draw(ctx, game.current, head.current, looks.current, now / 1000, level.current)
+      // A new level (or a new game): its name, from now
+      if (game.current.level !== started.current.level) started.current = { level: game.current.level, at: now / 1000 }
+      const since = phaseRef.current === 'ready' ? Infinity : now / 1000 - started.current.at
+      draw(ctx, game.current, head.current, looks.current, now / 1000, level.current, since)
       animation = requestAnimationFrame(tick)
     }
     animation = requestAnimationFrame(tick)
@@ -361,6 +544,7 @@ export default function Plink() {
   function play() {
     stage.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
     game.current = fresh()
+    started.current = { level: 0, at: 0 }
     setScore(0)
     setNewBest(false)
     setPhase('playing')
@@ -381,17 +565,27 @@ export default function Plink() {
   }
   function down(e) {
     e.preventDefault()
+    // On the score: not a shot, but maybe the cheat
+    const [x, y] = at(e)
+    if (y < HUD && x < SCORE_BOX.width) return tapScore()
+    taps.current = []
     if (phaseRef.current === 'ready') return play()
     if (phaseRef.current !== 'playing') return
     stage.current.setPointerCapture(e.pointerId)
     aiming.current = true
-    game.current = aimAt(game.current, ...at(e))
+    dragX.current = e.clientX
+    if (e.pointerType === 'mouse') game.current = aimAt(game.current, ...at(e))
   }
   function move(e) {
-    // A mouse aims just by moving over it; a finger while it's down
-    if (!aiming.current && e.pointerType !== 'mouse') return
     if (phaseRef.current !== 'playing') return
-    game.current = aimAt(game.current, ...at(e))
+    // A mouse aims where it points, just by moving over it
+    if (e.pointerType === 'mouse') return void (game.current = aimAt(game.current, ...at(e)))
+    // A finger turns the aim as it drags side to side, from wherever it went down, so small moves
+    // are fine adjustments and it isn't covering where it's aiming (Australia Mode's upside down)
+    if (!aiming.current) return
+    const flip = document.documentElement.hasAttribute('data-cheat-australia') ? -1 : 1
+    game.current = turn(game.current, (e.clientX - dragX.current) * DRAG * flip)
+    dragX.current = e.clientX
   }
   function up() {
     if (!aiming.current) return
@@ -432,7 +626,7 @@ export default function Plink() {
       </p>
       <h1 className="page-title">Plink</h1>
       <p className="lede">
-        Aim with your finger (or the arrow keys) and let go to fire my head into the pegs. Hit every gold one to clear the
+        Drag your finger side to side to aim (or point the mouse, or the arrow keys), and let go to fire my head into the pegs. Hit every gold one to clear the
         level. Land in the bucket for a free ball. Green pegs are power-ups.
       </p>
 

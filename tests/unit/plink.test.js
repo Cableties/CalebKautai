@@ -136,3 +136,32 @@ test('plink: every mix of settings has its own board', () => {
   assert.equal(plink.plinkGame({ nobucket: true, moving: true }), 'plink-nobucket-moving')
   assert.equal(plink.PLINK_GAMES.length, 8)
 })
+
+test("plink: the aim turns (a finger dragging) within its limits, and reaches the top row's far ends, even on a wide board", () => {
+  let s = plink.start({}, first)
+  s = plink.turn(s, 0.5)
+  assert.equal(s.aim, 0.5)
+  s = plink.turn(s, 10)
+  assert.ok(s.aim > Math.PI / 2 && s.aim < 2)
+  assert.equal(plink.turn(s, -20).aim, -s.aim)
+  for (const width of [plink.WIDTH, 840]) {
+    const s = plink.start({ width }, () => 0.5)
+    const top = Math.min(...s.pegs.map((p) => p.y))
+    const row = s.pegs.filter((p) => p.y === top).sort((a, b) => a.x - b.x)
+    for (const end of [row[0], row.at(-1)]) {
+      let reached = false
+      for (let x = 0; x <= width && !reached; x += 2) {
+        for (const y of [0, plink.LAUNCHER.y, 100, 150]) reached ||= s.pegs[plink.aimed(plink.aimAt(s, x, y)).peg] === end
+      }
+      assert.ok(reached, `${width}: the peg at ${end.x}`)
+    }
+  }
+})
+
+test("plink: Super Aim's guide goes further than any other, and it's still the same high-score board", () => {
+  const s = { ...plink.start({}, first), aim: 0.3 }
+  const long = plink.aimed({ ...s, longAim: 1 })
+  const most = plink.aimed({ ...s, superAim: true })
+  assert.ok(most.points.length > long.points.length)
+  assert.equal(plink.start({ superAim: true }).superAim, true)
+})

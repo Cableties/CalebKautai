@@ -235,6 +235,27 @@ test.describe("Plink", () => {
 	});
 });
 
+test.describe("Plink: Super Aim", () => {
+	test("three taps on the score switch it on, for good, without starting the game; three more switch it off", async ({ page }) => {
+		await page.goto("/games/plink");
+		const stage = page.locator(".game-stage");
+		await stage.scrollIntoViewIfNeeded();
+		const box = await stage.boundingBox();
+		// The score's in the strip along the top, on the left
+		const score = { x: box.x + box.width * 0.04, y: box.y + box.height * 0.03 };
+		for (let i = 0; i < 3; i++) await page.mouse.click(score.x, score.y);
+		await expect(page.getByText("Tap to start")).toBeVisible();
+		await expect.poll(() => page.evaluate(() => localStorage.getItem("plink-superaim"))).toBe("on");
+		// Nothing changes about the board the score goes on
+		await expect(page.getByRole("button", { name: "Settings" })).toBeVisible();
+		await page.reload();
+		await expect.poll(() => page.evaluate(() => localStorage.getItem("plink-superaim"))).toBe("on");
+		const again = await stage.boundingBox();
+		for (let i = 0; i < 3; i++) await page.mouse.click(again.x + again.width * 0.04, again.y + again.height * 0.03);
+		await expect.poll(() => page.evaluate(() => localStorage.getItem("plink-superaim"))).toBe("off");
+	});
+});
+
 test.describe("Invaders", () => {
 	test("holding a finger down slides the cannon under it and fires, and hits score", async ({
 		page,
