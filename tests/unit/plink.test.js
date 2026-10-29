@@ -1,0 +1,138 @@
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import * as plink from '../../src/lib/plink.js'
+
+const first = () => 0
+// Play the shot out
+function playOut(s, dt = () => 1 / 60) {
+  for (let i = 0; i < 60 * 60 && s.inPlay.length; i++) s = plink.step(s, dt(), {}, first)
+  return s
+}
+// A board with just the given pegs: { x, y, kind, power }, plus a gold one out of the way so it isn't
+// cleared
+function board(pegs, extra = {}) {
+  const s = plink.start({ nopowers: true }, first)
+  s.pegs = [...pegs, { x: 20, y: 120, kind: 'gold' }].map((p) => ({ lit: false, gone: false, sway: 0, kind: 'plain', ...p }))
+  return { ...s, ...extra }
+}
+const golds = (s) => s.pegs.filter((p) => p.kind === 'gold').length
+
+test('plink: every level has a board of well-spaced pegs, some of them gold, and balls to clear it', () => {
+  for (const width of [plink.WIDTH, 840]) {
+    let s = plink.start({ width }, Math.random)
+    for (let l = 1; l <= plink.PATTERNS.length; l++) {
+      assert.equal(s.level, l)
+      assert.ok(s.pegs.length > 35, `${width} level ${l}: ${s.pegs.length} pegs`)
+      assert.ok(golds(s) >= s.pegs.length * 0.19 * Math.sqrt(plink.WIDTH / width))
+      assert.equal(s.balls, width > plink.WIDTH ? 12 : 10)
+      for (const p of s.pegs) {
+        assert.ok(p.x >= plink.PEG_R && p.x <= width - plink.PEG_R)
+        for (const q of s.pegs) assert.ok(p === q || Math.hypot(p.x - q.x, p.y - q.y) >= 33)
+      }
+      // Every gold lit, and a shot that hits nothing: cleared
+      s.pegs = s.pegs.filter((p) => p.kind === 'gold').slice(0, 1)
+      s.pegs[0].lit = true
+      s = playOut(plink.fire(plink.aimAt(s, 0, plink.LAUNCHER.y)))
+    }
+  }
+})
+
+test('plink: a ball fired down bounces off the peg under it, which lights, scores, and goes once the ball is out', () => {
+  let s = board([{ x: plink.WIDTH / 2, y: 300 }], { bucket: false })
+  s = plink.fire(s)
+  assert.equal(s.balls, 9)
+  s = playOut(s)
+  assert.equal(s.score, 10)
+  assert.equal(s.pegs.length, 1)
+  assert.ok(!s.over)
+})
+
+test('plink: each five pegs in a shot are worth more than the five before', () => {
+  // The first level's board, all plain pegs
+  const pegs = plink.start({}, first).pegs.map(({ x, y }) => ({ x, y }))
+  const s = playOut(plink.fire(board(pegs, { bucket: false, aim: 0.2 })))
+  const lit = pegs.length - (s.pegs.length - 1)
+  assert.ok(lit > 5, `${lit} lit`)
+  let expected = 0
+  for (let k = 0; k < lit; k++) expected += 10 * (1 + Math.floor(k / 5))
+  assert.equal(s.score, expected)
+})
+
+test('plink: landing in the bucket is a free ball', () => {
+  // Timed so the bucket's right under the launcher as the ball gets there, about 0.77s after it's fired
+  let s = board([], { clock: -0.77 })
+  assert.ok(Math.abs(plink.bucketX(s, 0) - plink.WIDTH / 2) < 1)
+  s = playOut(plink.fire(s))
+  assert.equal(s.balls, 10)
+  // Without it the ball's just gone
+  s = playOut(plink.fire(board([], { bucket: false })))
+  assert.equal(s.balls, 9)
+})
+
+test("plink: clearing the gold is the next level, with points for every ball that's left; out of balls first, it's over", () => {
+  let s = board([{ x: plink.WIDTH / 2, y: 300, kind: 'gold' }], { bucket: false })
+  s.pegs = s.pegs.slice(0, 1)
+  s = playOut(plink.fire(s))
+  assert.equal(s.level, 2)
+  assert.equal(s.score, 50 + 9 * 500)
+  assert.equal(s.balls, 10)
+
+  s = board([], { bucket: false, balls: 1 })
+  s = playOut(plink.fire(s))
+  assert.ok(s.over)
+})
+
+test('plink: power-up pegs: an extra ball, a blast, the long aiming guide, a big bucket', () => {
+  const at = { x: plink.WIDTH / 2, y: 300, kind: 'power' }
+  let s = plink.step(plink.fire(board([{ ...at, power: 'multi' }], { bucket: false })), 0.5, {}, first)
+  assert.equal(s.inPlay.length, 2)
+
+  s = playOut(plink.fire(board([{ ...at, power: 'blast' }, { x: at.x + 50, y: 320 }, { x: at.x - 60, y: 280 }, { x: 300, y: 500 }], { bucket: false })))
+  assert.deepEqual(s.pegs.map((p) => p.x), [300, 20])
+
+  s = playOut(plink.fire(board([{ ...at, power: 'aim' }], { bucket: false })))
+  assert.equal(s.longAim, 3)
+  s = { ...plink.start({}, first), aim: 0.3 }
+  assert.ok(plink.aimed(s).contact)
+  assert.ok(plink.aimed({ ...s, longAim: 1 }).points.length > plink.aimed(s).points.length)
+
+  s = playOut(plink.fire(board([{ ...at, power: 'bucket' }], { bucket: false })))
+  assert.equal(plink.bucketWidth(s), plink.BUCKET.big)
+})
+
+test('plink: a ball stuck sitting on a peg knocks it out', () => {
+  // Dropped dead on top of it, it'd bounce there for ever
+  let s = board([{ x: 100, y: 300 }], { bucket: false })
+  s = plink.fire(s)
+  s.inPlay = [{ x: 100, y: 280, vx: 0, vy: 0, ax: 100, ay: 280, still: 0 }]
+  s = plink.step(s, 1, {}, first)
+  assert.equal(s.pegs.length, 2)
+  s = playOut(s)
+  assert.equal(s.pegs.length, 1)
+  assert.equal(s.score, 10)
+})
+
+test("plink: the aiming guide shows exactly the shot's first peg, at any frame rate, pegs moving or not", () => {
+  let checked = 0
+  for (let i = 0; i < 300; i++) {
+    let s = plink.start({ moving: i % 2 === 1 }, Math.random)
+    s = plink.step(s, Math.random(), {}) // somewhere along in the moving things
+    s = plink.aimAt(s, Math.random() * s.width, 200 + Math.random() * 400)
+    const { peg } = plink.aimed(s)
+    const marked = s.pegs.map((p, n) => ({ ...p, n }))
+    s = plink.fire({ ...s, pegs: marked })
+    while (s.inPlay.length && s.chain === 0) s = plink.step(s, 1 / 240 + Math.random() / 40, {})
+    const lit = s.pegs.filter((p) => p.lit)
+    // Two hit in one frame: can't tell which was first
+    if (lit.length !== 1) continue
+    assert.equal(lit[0].n, peg)
+    checked++
+  }
+  assert.ok(checked > 200, `${checked} checked`)
+})
+
+test('plink: every mix of settings has its own board', () => {
+  assert.equal(plink.plinkGame({}), 'plink')
+  assert.equal(plink.plinkGame({ nobucket: true, moving: true }), 'plink-nobucket-moving')
+  assert.equal(plink.PLINK_GAMES.length, 8)
+})

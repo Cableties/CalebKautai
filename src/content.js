@@ -172,6 +172,12 @@ export const games = [
 		icon: "🫧",
 		note: "Aim, fire, match three. Bombs, lightning and rainbow shots.",
 	},
+	{
+		to: "/games/plink",
+		label: "Plink",
+		icon: "🟡",
+		note: "Fire my head into the pegs. Clear the gold ones, and catch it in the bucket for another go.",
+	},
 ];
 
 export const thingsToDo = [
@@ -203,7 +209,7 @@ export const thingsToDo = [
 	{
 		to: "/games",
 		label: "Games",
-		note: "Flappy Head, Bonk, pinball, Snake, Invaders, Bricks and Bubbles. Get your initials on the high scores.",
+		note: "Flappy Head, Bonk, pinball, Snake, Invaders, Bricks, Bubbles and Plink. Get your initials on the high scores.",
 	},
 	{
 		to: "/find-me",
@@ -288,6 +294,10 @@ export const pageMeta = {
 	"/games/bubbles": {
 		title: "Bubbles",
 		description: "A bubble shooter with Caleb's head in the launcher. Match three, drop the rest.",
+	},
+	"/games/plink": {
+		title: "Plink",
+		description: "Fire Caleb's head down into a board of pegs. Clear the gold ones before the balls run out.",
 	},
 	"/games/invaders": {
 		title: "Invaders",

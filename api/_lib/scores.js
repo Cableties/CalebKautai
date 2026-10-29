@@ -8,6 +8,7 @@ import { BUBBLES_GAMES, POINTS_PER_SECOND as BUBBLE_POINTS_PER_SECOND } from '..
 import { FLAPPY_GAMES, SECONDS_PER_PIPE } from '../../src/lib/flappy.js'
 import { INVADERS_GAMES, POINTS_PER_SECOND as INVADER_POINTS_PER_SECOND } from '../../src/lib/invaders.js'
 import { POINTS_PER_SECOND, TABLES } from '../../src/lib/pinball.js'
+import { PLINK_GAMES, POINTS_PER_SECOND as PLINK_POINTS_PER_SECOND } from '../../src/lib/plink.js'
 import { ROWS, SECONDS_PER_SNACK, SNAKE_GAMES, WIDE_COLS } from '../../src/lib/snake.js'
 
 const HOUR = 60 * 60 * 1000
@@ -28,6 +29,8 @@ export const GAMES = {
   ...boards(BRICKS_GAMES, { minMs: (score) => (score / BRICK_POINTS_PER_SECOND) * 1000, max: 1_000_000 }),
   // None faster than a whole board dropping off every shot
   ...boards(BUBBLES_GAMES, { minMs: (score) => (score / BUBBLE_POINTS_PER_SECOND) * 1000, max: 10_000_000 }),
+  // None faster than a long chain of bonus pegs non-stop
+  ...boards(PLINK_GAMES, { minMs: (score) => (score / PLINK_POINTS_PER_SECOND) * 1000, max: 1_000_000_000 }),
   // A board per pinball table, none faster than a ball pinging between bumpers non-stop
   ...Object.fromEntries(
     TABLES.map((t) => [`pinball-${t.id}`, { minMs: (score) => (score / POINTS_PER_SECOND) * 1000, max: 10_000_000 }]),

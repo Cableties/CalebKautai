@@ -22,7 +22,7 @@ test("the games page lists the games, and the menu leads there", async ({
 	await expect(
 		page.getByRole("heading", { name: "Bonk", level: 1 }),
 	).toBeVisible();
-	for (const name of ["Snake", "Invaders", "Bricks", "Bubbles"]) {
+	for (const name of ["Snake", "Invaders", "Bricks", "Bubbles", "Plink"]) {
 		await page.getByRole("link", { name: "← All games" }).click();
 		await page.getByRole("link", { name: new RegExp(name) }).click();
 		await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
@@ -204,6 +204,34 @@ test.describe("Bubbles", () => {
 		const { width, height } = await page.locator(".game-stage").boundingBox();
 		const wide = await page.evaluate(() => matchMedia("(min-width: 900px) and (min-aspect-ratio: 5/4)").matches);
 		expect(width / height > 1).toBe(wide);
+	});
+});
+
+test.describe("Plink", () => {
+	test("Space starts it and fires, and the ball lights pegs and scores", async ({ page }) => {
+		await page.goto("/games/plink");
+		await page.keyboard.press(" ");
+		await expect(page.getByText("Tap to start")).toBeHidden();
+		// Straight down from the launcher, into the first level's rows of pegs
+		await page.keyboard.press(" ");
+		await expect(page.getByRole("img", { name: /Plink. Score: [1-9]/ })).toBeVisible({
+			timeout: 5000,
+		});
+	});
+
+	test("a finger aims while it's down and fires when it lets go", async ({ page }) => {
+		await page.goto("/games/plink");
+		const stage = page.locator(".game-stage");
+		await stage.scrollIntoViewIfNeeded();
+		const box = await stage.boundingBox();
+		await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+		await expect(page.getByText("Tap to start")).toBeHidden();
+		await page.mouse.move(box.x + box.width * 0.3, box.y + box.height * 0.6);
+		await page.mouse.down();
+		await page.mouse.up();
+		await expect(page.getByRole("img", { name: /Plink. Score: [1-9]/ })).toBeVisible({
+			timeout: 5000,
+		});
 	});
 });
 
@@ -510,6 +538,7 @@ test.describe("tap feedback", () => {
 		["/games/invaders", ".game-stage"],
 		["/games/bricks", ".game-stage"],
 		["/games/bubbles", ".game-stage"],
+		["/games/plink", ".game-stage"],
 	]) {
 		test(`${path}: no blue flash on a tap`, async ({ page, browserName }) => {
 			// Only Chromium's test build reports the tap highlight
