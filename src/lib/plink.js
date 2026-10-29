@@ -7,7 +7,9 @@ import { allSettingsGames, settingsGame } from './settings.js'
 // Clear every gold peg to finish the level; run out of balls first and it's over. A bucket slides
 // along the bottom: land in it for a free ball.
 //
-// Each peg lit in a shot is worth more than the last: every five steps the multiplier up. Power-up
+// Each five pegs lit in a shot step its multiplier up (a combo), and trick shots add to it for the
+// rest of the shot: a long shot (a gold peg after a long flight without touching another), a bank
+// shot (a gold peg straight off a wall) and a gold combo (every third gold peg in a shot). Power-up
 // pegs (green) do their thing when they're hit: an extra ball, a blast that lights everything
 // round it, a longer aiming guide, or a bigger bucket. A pink peg is a big bonus.
 //
@@ -33,6 +35,8 @@ const BALLS = { normal: 10, wide: 12, easy: 3 } // a level's balls (and Easy Mod
 const STILL = { distance: 18, seconds: 1.5 } // a ball that hasn't got this far in this long is stuck
 const POINTS = { plain: 10, gold: 50, power: 25, bonus: 300 }
 const CHAIN = 5 // pegs in a shot for each step up in its multiplier
+const LONG_SHOT = 300 // how far a ball flies, touching no pegs, for a long shot
+const GOLD_COMBO = 3 // gold pegs in a shot for each gold combo
 const CLEAR_BONUS = 500 // per ball left, when a level's cleared
 const BLAST = 80 // how far round a blast lights pegs
 const SWAY = { amp: 22, speed: 0.9 } // moving pegs
@@ -48,7 +52,7 @@ export const PLINK_GAMES = allSettingsGames('plink', SETTINGS)
 
 // The fastest anyone could score, for the server's sanity check: a long chain of bonus pegs every
 // second, far beyond anything playable
-export const POINTS_PER_SECOND = 500_000
+export const POINTS_PER_SECOND = 5_000_000
 
 export const launcherX = (s) => s.width / 2
 
@@ -168,6 +172,8 @@ export function start(
     due: 0, // time owed from frames that weren't a whole number of steps
     inPlay: [], // balls in flight: { x, y, vx, vy, ax, ay, still } (ax, ay, still: for spotting a stuck one)
     chain: 0, // pegs lit this shot
+    tricks: 0, // trick shots this shot, each adding one to its multiplier
+    golds: 0, // gold pegs lit this shot
     shotScore: 0,
     longAim: 0, // shots left with the long aiming guide
     bigBucket: 0, // shots left with the big bucket
@@ -203,6 +209,8 @@ const launch = (s) => ({
   ax: launcherX(s),
   ay: LAUNCHER.y,
   still: 0,
+  flown: 0, // how far since it last touched a peg, for a long shot
+  banked: false, // off a wall since it last touched a peg, for a bank shot
 })
 
 export function fire(state) {
@@ -212,6 +220,8 @@ export function fire(state) {
     inPlay: [launch(state)],
     balls: state.balls - 1,
     chain: 0,
+    tricks: 0,
+    golds: 0,
     shotScore: 0,
     longAim: Math.max(0, state.longAim - 1),
     fired: true,
@@ -242,16 +252,20 @@ function move(s, ball, clock, hit) {
   ball.vy += GRAVITY * SUB
   ball.x += ball.vx * SUB
   ball.y += ball.vy * SUB
+  ball.flown += Math.hypot(ball.vx, ball.vy) * SUB
   if (ball.x < BALL_R) {
     ball.x = BALL_R
     ball.vx = Math.abs(ball.vx) * BOUNCE.wall
+    ball.banked = true
   } else if (ball.x > s.width - BALL_R) {
     ball.x = s.width - BALL_R
     ball.vx = -Math.abs(ball.vx) * BOUNCE.wall
+    ball.banked = true
   }
   if (ball.y < HUD + BALL_R) {
     ball.y = HUD + BALL_R
     ball.vy = Math.abs(ball.vy) * BOUNCE.wall
+    ball.banked = true
   }
   for (const p of s.pegs) {
     if (!p.gone && bounce(ball, pegX(s, p, clock), p.y, PEG_R)) hit(p)
@@ -273,10 +287,10 @@ function move(s, ball, clock, hit) {
 }
 
 // Where a shot fired now would go, for the aiming guide: its path, up to its first peg (or third,
-// with the long guide; second in Easy Mode; fifth with Super Aim, the page's hidden cheat), and where it touches that one (`contact`, or null if it
+// with the long guide; second in Easy Mode or with Super Aim, the page's hidden cheat), and where it touches that one (`contact`, or null if it
 // touches none), and which peg (`peg`, its index)
 export function aimed(state) {
-  const hits = state.superAim ? 5 : state.longAim > 0 ? 3 : state.easy ? 2 : 1
+  const hits = Math.max(1, state.longAim > 0 ? 3 : 1, state.superAim || state.easy ? 2 : 1)
   const ball = launch(state)
   const points = [[ball.x, ball.y]]
   let clock = state.clock
@@ -301,14 +315,40 @@ export function aimed(state) {
 }
 
 // A peg lit: its points (more the longer the chain), and its power-up if it has one
+// The shot's multiplier: its combo (a step up every five pegs) times one more for each trick shot
+export const multiplier = (s) => (1 + Math.floor(Math.max(0, s.chain - 1) / CHAIN)) * (1 + s.tricks)
+
+// A trick shot: the rest of the shot's worth one more times as much
+function trick(s, text, x, y) {
+  s.tricks++
+  s.trick = text
+  s.labels.push({ x, y: y - 22, text: `${text} ×${1 + s.tricks}`, age: 0 })
+}
+
+// A ball's touched a peg: a trick shot, maybe, if it's a gold one not yet lit
+function touch(s, p, ball, added) {
+  if (!p.lit && p.kind === 'gold') {
+    if (ball.flown >= LONG_SHOT) trick(s, 'Long shot!', pegX(s, p), p.y)
+    else if (ball.banked) trick(s, 'Bank shot!', pegX(s, p), p.y)
+  }
+  ball.flown = 0
+  ball.banked = false
+  light(s, p, ball, added)
+}
+
 function light(s, p, ball, added) {
   if (p.lit) return
   p.lit = true
   s.chain++
-  const points = POINTS[p.kind] * s.level * (1 + Math.floor((s.chain - 1) / CHAIN))
+  const x = pegX(s, p)
+  if (p.kind === 'gold' && ++s.golds % GOLD_COMBO === 0) trick(s, 'Gold combo!', x, p.y)
+  if (s.chain > 1 && (s.chain - 1) % CHAIN === 0) {
+    s.labels.push({ x, y: p.y + 22, text: `Combo ×${1 + (s.chain - 1) / CHAIN}`, age: 0 })
+    s.combo = true
+  }
+  const points = POINTS[p.kind] * s.level * multiplier(s)
   s.score += points
   s.shotScore += points
-  const x = pegX(s, p)
   // What the sound's for: gold over the rest
   if (s.hit !== 'gold') s.hit = p.kind
   if (p.kind === 'gold' && !s.pegs.some((q) => q.kind === 'gold' && !q.lit)) {
@@ -319,7 +359,7 @@ function light(s, p, ball, added) {
   if (p.kind !== 'power') return
   s.labels.push({ x, y: p.y, text: POWERS[p.power], age: 0 })
   s.powered = p.power
-  if (p.power === 'multi') added.push({ ...ball, vx: -ball.vx || 120, ax: ball.x, ay: ball.y, still: 0 })
+  if (p.power === 'multi') added.push({ ...ball, vx: -ball.vx || 120, ax: ball.x, ay: ball.y, still: 0, flown: 0, banked: false })
   if (p.power === 'aim') s.longAim = 3
   // The rest of this shot, and the next three
   if (p.power === 'bucket') s.bigBucket = 4
@@ -363,12 +403,23 @@ function settle(s, random) {
 }
 
 // One frame. `input`: { left, right } (keys held, turning the aim). Flags what happened this frame,
-// for the sounds: `fired`, `hit` (the kind of peg), `lastGold`, `powered`, `caught` (a free ball),
+// for the sounds: `fired`, `hit` (the kind of peg), `lastGold`, `powered`, `trick` (a trick shot's
+// name), `combo` (the multiplier's stepped up), `caught` (a free ball),
 // `settled` (the shot's over), `cleared` (a level done).
 export function step(state, dt, input = {}, random = Math.random) {
   if (state.over) return state
   const s = structuredClone(state)
-  Object.assign(s, { fired: false, hit: null, lastGold: false, powered: null, caught: false, settled: false, cleared: false })
+  Object.assign(s, {
+    fired: false,
+    hit: null,
+    lastGold: false,
+    powered: null,
+    trick: null,
+    combo: false,
+    caught: false,
+    settled: false,
+    cleared: false,
+  })
   s.pops = s.pops.map((p) => ({ ...p, age: p.age + dt })).filter((p) => p.age < 0.35)
   s.labels = s.labels.map((l) => ({ ...l, age: l.age + dt })).filter((l) => l.age < 1.2)
   if (input.left) s.aim = Math.max(-AIM.max, s.aim - AIM.turn * dt)
@@ -381,7 +432,7 @@ export function step(state, dt, input = {}, random = Math.random) {
     if (!s.inPlay.length) continue
     const added = []
     s.inPlay = s.inPlay.filter((ball) => {
-      const out = move(s, ball, s.clock, (p) => light(s, p, ball, added))
+      const out = move(s, ball, s.clock, (p) => touch(s, p, ball, added))
       if (out === 'caught') {
         s.balls++
         s.caught = true

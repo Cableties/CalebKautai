@@ -17,6 +17,7 @@ import {
   bucketX,
   fire,
   launcherX,
+  multiplier,
   pegX,
   plinkGame,
   start,
@@ -34,10 +35,10 @@ import { approach, themeAt } from '../lib/themes.js'
 
 // Plink: fire my head down into a board of pegs, and clear the gold ones. The rules are in
 // lib/plink.js; this draws them on a canvas and handles input: point the mouse to aim and click to
-// fire, drag a finger side to side to aim and let go to fire, or the arrow keys and Space. Settings are behind the cog, and each mix has its
-// own high scores. Super Aim's a hidden cheat: tap the score three times, and the aiming guide shows
-// the path through five pegs, from then on in this browser (three more taps to switch it off). It
-// still counts for the high scores.
+// fire, drag a finger side to side to aim and let go to fire, or the arrow keys and Space. Settings
+// are behind the cog, and each mix has its own high scores. Super Aim's a hidden cheat: tap the
+// score three times, and the aiming guide shows the path through two pegs, from then on in this
+// browser (three more taps to switch it off). It still counts for the high scores.
 const LEFT_KEYS = ['ArrowLeft', 'a', 'A']
 const RIGHT_KEYS = ['ArrowRight', 'd', 'D']
 const FIRE_KEYS = [' ', 'ArrowDown', 's', 'S', 'Enter']
@@ -369,6 +370,14 @@ function draw(ctx, game, head, looks, time, level, since) {
   ctx.fillStyle = '#fff'
   ctx.textAlign = 'left'
   ctx.fillText(String(game.score), 14, HUD / 2 + 1)
+  // The shot's multiplier, while it's more than one
+  const times = multiplier(game)
+  if (game.inPlay.length && times > 1) {
+    const after = 14 + ctx.measureText(String(game.score)).width + 8
+    ctx.font = '800 15px system-ui, sans-serif'
+    ctx.fillStyle = PEGS.gold
+    ctx.fillText(`×${times}`, after, HUD / 2 + 1)
+  }
   ctx.font = '700 15px system-ui, sans-serif'
   ctx.textAlign = 'center'
   const golds = game.pegs.filter((p) => p.kind === 'gold' && !p.lit).length
@@ -393,8 +402,8 @@ function draw(ctx, game, head, looks, time, level, since) {
 function effects(g) {
   if (g.fired) feedback('kicker')
   if (g.cleared) feedback('wave')
-  else if (g.caught || g.powered || g.lastGold) feedback('bonus')
-  else if (g.hit === 'gold' || g.hit === 'bonus') feedback('point')
+  else if (g.caught || g.powered || g.lastGold || g.trick) feedback('bonus')
+  else if (g.combo || g.hit === 'gold' || g.hit === 'bonus') feedback('point')
   else if (g.hit) feedback('rollover')
 }
 
@@ -627,7 +636,7 @@ export default function Plink() {
       <h1 className="page-title">Plink</h1>
       <p className="lede">
         Drag your finger side to side to aim (or point the mouse, or the arrow keys), and let go to fire my head into the pegs. Hit every gold one to clear the
-        level. Land in the bucket for a free ball. Green pegs are power-ups.
+        level. Land in the bucket for a free ball. Green pegs are power-ups. Combos, long shots and bank shots multiply your points.
       </p>
 
       <div className="game-layout">

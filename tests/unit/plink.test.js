@@ -158,10 +158,48 @@ test("plink: the aim turns (a finger dragging) within its limits, and reaches th
   }
 })
 
-test("plink: Super Aim's guide goes further than any other, and it's still the same high-score board", () => {
+test("plink: Super Aim's guide shows the first two pegs (the long guide's three still wins), and it's still the same high-score board", () => {
   const s = { ...plink.start({}, first), aim: 0.3 }
-  const long = plink.aimed({ ...s, longAim: 1 })
-  const most = plink.aimed({ ...s, superAim: true })
-  assert.ok(most.points.length > long.points.length)
+  // How many different pegs the path touches before it stops
+  const reach = (state) => plink.aimed(state).points.length
+  const plain = reach(s)
+  const sup = reach({ ...s, superAim: true })
+  assert.ok(sup > plain)
+  assert.equal(sup, reach({ ...s, easy: true }))
+  assert.equal(reach({ ...s, superAim: true, longAim: 1 }), reach({ ...s, longAim: 1 }))
+  assert.ok(reach({ ...s, longAim: 1 }) > sup)
   assert.equal(plink.start({ superAim: true }).superAim, true)
+})
+
+test('plink: trick shots: a long shot, a bank shot and a gold combo each add one to the rest of the shot\'s multiplier', () => {
+  // Long: straight down a long way to a gold peg, then a plain one under it
+  let s = playOut(plink.fire(board([{ x: plink.WIDTH / 2, y: 420, kind: 'gold' }, { x: plink.WIDTH / 2 + 12, y: 460 }], { bucket: false })))
+  assert.equal(s.score, 50 * 2 + 10 * 2)
+
+  // Bank: off the left wall into a gold peg
+  s = board([{ x: 40, y: 300, kind: 'gold' }], { bucket: false })
+  let banked = false
+  for (let aim = -1.85; aim < -0.9 && !banked; aim += 0.01) {
+    let shot = plink.fire({ ...s, aim })
+    for (let i = 0; i < 600 && shot.inPlay.length && !shot.chain; i++) {
+      shot = plink.step(shot, 1 / 60, {}, first)
+      if (shot.trick === 'Bank shot!') banked = shot.score === 100
+    }
+  }
+  assert.ok(banked)
+
+  // Gold combo: three golds in one shot (lit in a blast), the third and on worth twice as much
+  s = board(
+    [
+      { x: plink.WIDTH / 2, y: 200, kind: 'power', power: 'blast' },
+      { x: plink.WIDTH / 2 - 40, y: 200, kind: 'gold' },
+      { x: plink.WIDTH / 2 + 40, y: 200, kind: 'gold' },
+      { x: plink.WIDTH / 2, y: 240, kind: 'gold' },
+    ],
+    { bucket: false },
+  )
+  s = plink.step(plink.fire(s), 0.5, {}, first)
+  assert.equal(s.tricks, 1)
+  assert.equal(s.score, 25 + 50 + 50 + 50 * 2)
+  assert.equal(plink.multiplier(s), 2)
 })
