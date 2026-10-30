@@ -52,36 +52,88 @@ const NUDGE = { by: 0.003, hold: 250 }
 const PEGS = { gold: '#f5b937', power: '#5cc97a', bonus: '#f05d8a' } // plain ones are the level's colour
 // Each level its own scene, going round, fading from one to the next. `peg`: the plain pegs; `dots`:
 // the aim and writing on the board; `far` and `near`: the hills along the bottom. The numbers fade
-// each scene's bits in and out: clouds, bubbles rising, rays of light, a low sun, petals falling,
-// stars and the moon.
+// each scene's bits in and out: clouds, bubbles rising, rays of light, a low sun, petals (or leaves)
+// falling in `petal` and `petal2`, snow, stars and the moon.
 const LEVELS = [
   {
     top: '#e6defa', bottom: '#cfe6f7', peg: '#8f7fd6', dots: '#2e2a45', far: '#d6cdf5', near: '#b9a9e8',
-    clouds: 1, rising: 0, rays: 0, sun: 0, petals: 0, stars: 0,
+    clouds: 1, rising: 0, rays: 0, sun: 0, petals: 0, snow: 0, stars: 0,
+    petal: '#f7b6cf', petal2: '#ffffff',
   },
   {
     top: '#bfe6f2', bottom: '#5fa9d3', peg: '#3f7fb3', dots: '#16365a', far: '#4f97c4', near: '#ecd9a4',
-    clouds: 0, rising: 1, rays: 1, sun: 0, petals: 0, stars: 0,
+    clouds: 0, rising: 1, rays: 1, sun: 0, petals: 0, snow: 0, stars: 0,
+    petal: '#f7b6cf', petal2: '#ffffff',
   },
   {
     top: '#ffd9b8', bottom: '#f7a8c4', peg: '#8e4f9e', dots: '#2e2a45', far: '#d77fa0', near: '#8f4a78',
-    clouds: 0.5, rising: 0, rays: 0, sun: 1, petals: 0, stars: 0,
+    clouds: 0.5, rising: 0, rays: 0, sun: 1, petals: 0, snow: 0, stars: 0,
+    petal: '#f7b6cf', petal2: '#ffffff',
   },
   {
     top: '#dff4ff', bottom: '#fdf2c2', peg: '#5b8fd6', dots: '#2e2a45', far: '#b5e3bf', near: '#7cc58f',
-    clouds: 0.6, rising: 0, rays: 0, sun: 0, petals: 1, stars: 0,
+    clouds: 0.6, rising: 0, rays: 0, sun: 0, petals: 1, snow: 0, stars: 0,
+    petal: '#f7b6cf', petal2: '#ffffff',
   },
   {
     top: '#1f1b4d', bottom: '#4c3f8a', peg: '#9d93e0', dots: '#ffffff', far: '#2c2766', near: '#16133a',
-    clouds: 0, rising: 0, rays: 0, sun: 0, petals: 0, stars: 1,
+    clouds: 0, rising: 0, rays: 0, sun: 0, petals: 0, snow: 0, stars: 1,
+    petal: '#f7b6cf', petal2: '#ffffff',
+  },
+  {
+    top: '#ffe3c2', bottom: '#f6b07a', peg: '#b0533a', dots: '#3a2418', far: '#d9874b', near: '#8f4a2b',
+    clouds: 0.4, rising: 0, rays: 0, sun: 0, petals: 1, snow: 0, stars: 0,
+    petal: '#e2652f', petal2: '#c9a227',
+  },
+  {
+    top: '#a9bdd8', bottom: '#e6eef7', peg: '#4f6fae', dots: '#1d2a45', far: '#f4f8fc', near: '#ffffff',
+    clouds: 0.3, rising: 0, rays: 0, sun: 0, petals: 0, snow: 1, stars: 0,
+    petal: '#ffffff', petal2: '#ffffff',
+  },
+  {
+    top: '#1c5a86', bottom: '#0a1f3d', peg: '#3fb8c9', dots: '#ffffff', far: '#123a5e', near: '#244e5e',
+    clouds: 0, rising: 1, rays: 0.45, sun: 0, petals: 0, snow: 0, stars: 0,
+    petal: '#ffffff', petal2: '#ffffff',
   },
 ]
-const NAMES = ['Lavender sky', 'Under the sea', 'Sunset', 'Spring meadow', 'Starry night']
+const NAMES = ['Lavender sky', 'Under the sea', 'Sunset', 'Spring meadow', 'Starry night', 'Autumn woods', 'Snowfall', 'The deep']
 const TITLE_SECONDS = 2.2 // a level's name, as it starts
 const noise = (i, n) => Math.abs(Math.sin(i * 12.9898 + n * 78.233) * 43758.5453) % 1
 const lighter = (hex) => `#${[1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * 0.4 + 255 * 0.6).toString(16).padStart(2, '0')).join('')}`
 
-function peg(ctx, x, y, colour, lit, time) {
+// A bar's line, from end to end, for stroking
+function line(ctx, x, y, dx, dy) {
+  ctx.beginPath()
+  ctx.moveTo(x - dx, y - dy)
+  ctx.lineTo(x + dx, y + dy)
+}
+
+function peg(ctx, x, y, colour, lit, time, { dx = 0, dy = 0, r = PEG_R } = {}) {
+  if (dx || dy) {
+    // A bar: a thick line with round ends
+    ctx.lineCap = 'round'
+    if (lit) {
+      ctx.strokeStyle = 'rgb(255 255 255 / 0.35)'
+      ctx.lineWidth = (r + 4 + Math.sin(time * 10) * 1.5) * 2
+      line(ctx, x, y, dx, dy)
+      ctx.stroke()
+    }
+    ctx.strokeStyle = INK
+    ctx.lineWidth = r * 2 + 3
+    line(ctx, x, y, dx, dy)
+    ctx.stroke()
+    ctx.strokeStyle = lit ? lighter(colour) : colour
+    ctx.lineWidth = r * 2
+    line(ctx, x, y, dx, dy)
+    ctx.stroke()
+    // A shine along its top
+    ctx.strokeStyle = 'rgb(255 255 255 / 0.5)'
+    ctx.lineWidth = 1.6
+    line(ctx, x, y - r * 0.45, dx * 0.8, dy * 0.8)
+    ctx.stroke()
+    ctx.lineCap = 'butt'
+    return
+  }
   if (lit) {
     // Lit: pale, with a halo
     ctx.fillStyle = 'rgb(255 255 255 / 0.35)'
@@ -203,7 +255,7 @@ function backdrop(ctx, W, theme, time) {
     if (theme.petals > 0 && i < 22) {
       const y = HUD + ((time * (18 + noise(i, 3) * 20) + noise(i, 4) * HEIGHT) % (HEIGHT - HUD))
       ctx.globalAlpha = theme.petals * 0.8
-      ctx.fillStyle = i % 3 ? '#f7b6cf' : '#ffffff'
+      ctx.fillStyle = i % 3 ? theme.petal : theme.petal2
       ctx.save()
       ctx.translate(x + Math.sin(time + i) * 20, y)
       ctx.rotate(time * (1 + noise(i, 6)) + i)
@@ -211,6 +263,15 @@ function backdrop(ctx, W, theme, time) {
       ctx.ellipse(0, 0, 4.5, 2.5, 0, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
+    }
+    // Snow falling, drifting from side to side
+    if (theme.snow > 0) {
+      const y = HUD + ((time * (14 + noise(i, 3) * 16) + noise(i, 4) * HEIGHT) % (HEIGHT - HUD))
+      ctx.globalAlpha = theme.snow * 0.85
+      ctx.fillStyle = '#ffffff'
+      ctx.beginPath()
+      ctx.arc(x + Math.sin(time * 0.8 + i) * 14, y, 1.5 + noise(i, 5) * 2, 0, Math.PI * 2)
+      ctx.fill()
     }
     // Clouds drifting across
     if (theme.clouds > 0 && i < Math.ceil(W / 70)) {
@@ -279,7 +340,7 @@ function draw(ctx, game, head, looks, time, level, since) {
   for (const p of game.pegs) {
     if (p.gone) continue
     const x = pegX(game, p)
-    peg(ctx, x, p.y, PEGS[p.kind] ?? theme.peg, p.lit, time)
+    peg(ctx, x, p.y, PEGS[p.kind] ?? theme.peg, p.lit, time, p)
     if (p.kind === 'power' || p.kind === 'bonus') mark(ctx, p.kind, x, p.y)
   }
   // Gone ones burst into a ring, and sparks flying out
@@ -288,8 +349,19 @@ function draw(ctx, game, head, looks, time, level, since) {
     ctx.globalAlpha = 1 - p.age / 0.35
     ctx.strokeStyle = colour
     ctx.lineWidth = 2.5
-    ctx.beginPath()
-    ctx.arc(p.x, p.y, PEG_R * (1 + p.age * 5), 0, Math.PI * 2)
+    if (p.dx || p.dy) {
+      ctx.lineWidth = 2.5
+      ctx.lineJoin = 'round'
+      const r = PEG_R * (1 + p.age * 5)
+      const a = Math.atan2(p.dy, p.dx)
+      ctx.beginPath()
+      ctx.arc(p.x + p.dx, p.y + p.dy, r, a - Math.PI / 2, a + Math.PI / 2)
+      ctx.arc(p.x - p.dx, p.y - p.dy, r, a + Math.PI / 2, a + (Math.PI * 3) / 2)
+      ctx.closePath()
+    } else {
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, PEG_R * (1 + p.age * 5), 0, Math.PI * 2)
+    }
     ctx.stroke()
     ctx.fillStyle = colour
     for (let k = 0; k < 6; k++) {

@@ -26,8 +26,12 @@ test('plink: every level has a board of well-spaced pegs, some of them gold, and
       assert.ok(golds(s) >= s.pegs.length * 0.19 * Math.sqrt(plink.WIDTH / width))
       assert.equal(s.balls, width > plink.WIDTH ? 12 : 10)
       for (const p of s.pegs) {
-        assert.ok(p.x >= plink.PEG_R && p.x <= width - plink.PEG_R)
-        for (const q of s.pegs) assert.ok(p === q || Math.hypot(p.x - q.x, p.y - q.y) >= 33)
+        // Both ends of a bar on the board, and room for the ball between any two
+        for (const end of [-1, 1]) {
+          const x = p.x + end * (p.dx ?? 0)
+          assert.ok(x >= plink.PEG_R && x <= width - plink.PEG_R)
+        }
+        for (const q of s.pegs) assert.ok(p === q || plink.gap(p, q) >= 19)
       }
       // Every gold lit, and a shot that hits nothing: cleared
       s.pegs = s.pegs.filter((p) => p.kind === 'gold').slice(0, 1)
@@ -253,7 +257,7 @@ test('plink: the extra ball drops in from the top, always onto a peg not lit yet
       // Once it's there, wait for it to light a peg
       if (extra && s.inPlay.length === 2) {
         const now = s.pegs.filter((p, k) => p.lit && !was[k])
-        if (now.some((p) => Math.abs(plink.pegX(s, p) - s.inPlay[1].x) < 20)) {
+        if (now.some((p) => plink.away(s, p, s.inPlay[1].x, s.inPlay[1].y) < plink.BALL_R + plink.PEG_R + 4)) {
           extra = 'hit'
           break
         }
@@ -261,4 +265,30 @@ test('plink: the extra ball drops in from the top, always onto a peg not lit yet
     }
     assert.equal(extra, 'hit')
   }
+})
+
+test('plink: some levels have bars, and a ball dropped gently on one rolls along it and off the low end', () => {
+  const s0 = plink.start({ width: plink.WIDTH }, Math.random)
+  let bars = 0
+  for (let l = 0; l < plink.PATTERNS.length; l++) {
+    bars += plink.PATTERNS[l](plink.WIDTH).filter((item) => item.length === 4).length
+  }
+  assert.ok(bars >= 10)
+  // A bar sloping down to the right, and a ball dropped just onto its high end
+  const bar = { x: 180, y: 300, dx: 60 * Math.cos(0.3), dy: 60 * Math.sin(0.3), r: plink.BAR_R, kind: 'plain', lit: false, gone: false, sway: 0 }
+  let s = { ...s0, pegs: [bar, { x: 20, y: 120, kind: 'gold', lit: false, gone: false, sway: 0 }], bucket: false }
+  s.inPlay = [{ x: bar.x - bar.dx + 4, y: bar.y - bar.dy - plink.BAR_R - plink.BALL_R - 4, vx: 0, vy: 0, ax: 0, ay: 0, still: 0, flown: 0, banked: false }]
+  let touching = 0
+  let lowest = 0
+  for (let i = 0; i < 480 && s.inPlay.length; i++) {
+    s = plink.step(s, 1 / 240, {})
+    const ball = s.inPlay[0]
+    if (!ball || ball.x > bar.x + bar.dx) break
+    if (plink.away(s, bar, ball.x, ball.y) <= plink.BAR_R + plink.BALL_R + 0.5) touching++
+    lowest = Math.max(lowest, ball.x)
+  }
+  // On it most of the way along (not bouncing off), and it lit
+  assert.ok(touching > 60, `touching for ${touching} steps`)
+  assert.ok(lowest > bar.x + bar.dx - 10, `got to ${lowest}`)
+  assert.ok(s.pegs[0].lit)
 })

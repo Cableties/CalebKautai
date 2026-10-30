@@ -4,6 +4,7 @@ import { allSettingsGames, settingsGame } from './settings.js'
 // screen is a WIDTH (wider on a desktop) × HEIGHT box in its own units (y grows downwards). The
 // launcher's at the top: aim, and fire the ball (my head) down into a board of pegs. It bounces off
 // them under gravity, lighting each one it touches, and the lit ones go once it's off the bottom.
+// Some pegs are bars, straight and tilted: land on one gently and the ball rolls along it.
 // Clear every gold peg to finish the level; run out of balls first and it's over. A bucket slides
 // along the bottom: land in it for a free ball. A big shot (enough points in one) is a free ball
 // too.
@@ -22,6 +23,7 @@ export const HEIGHT = 640
 export const HUD = 44
 export const BALL_R = 8
 export const PEG_R = 7
+export const BAR_R = 5 // a bar's half-thickness
 export const LAUNCHER = { y: HUD + 30 }
 const SUB = 1 / 240 // seconds per step
 const GRAVITY = 620
@@ -29,6 +31,7 @@ const LAUNCH = 470
 const WIDE_LAUNCH = 1.3 // times as fast on a wide board, to reach its far top corners
 const MAX_SPEED = 900
 const BOUNCE = { peg: 0.72, wall: 0.85 }
+const ROLL = 110 // px per second: a ball meeting a bar slower than this stays on it, and rolls
 // Radians either side of straight down (a little past level, for the top corners); radians per
 // second with keys
 const AIM = { max: 1.85, turn: 1.4 }
@@ -59,7 +62,9 @@ export const POINTS_PER_SECOND = 5_000_000
 
 export const launcherX = (s) => s.width / 2
 
-// Where the pegs go: a pattern for each level, going round
+// Where the pegs go: a pattern for each level, going round. Each is a list of [x, y] for a round
+// peg, or [x, y, half its length, tilt (radians, clockwise)] for a bar. Bars go first, so the round
+// ones round them make room (spaced()).
 const AREA = { top: 150, bottom: 560, margin: 26, spacing: 34 }
 function grid(W) {
   const out = []
@@ -110,14 +115,125 @@ function spiral(W) {
   for (let x = AREA.margin; x <= W - AREA.margin; x += 44) out.push([x, AREA.bottom])
   return out
 }
-export const PATTERNS = [grid, waves, rings, arches, spiral]
+// Rows of bars sloping one way then the other, down through a grid
+function ramps(W) {
+  const out = []
+  for (let r = 0; r < 4; r++) {
+    for (let x = AREA.margin + 40 + (r % 2) * 50; x <= W - AREA.margin - 40; x += 110) out.push([x, 200 + r * 105, 34, r % 2 ? -0.32 : 0.32])
+  }
+  for (let r = 0, y = AREA.top; y <= AREA.bottom; r++, y += 52) {
+    for (let x = AREA.margin + (r % 2 ? 20 : 0); x <= W - AREA.margin; x += 40) out.push([x, y])
+  }
+  return out
+}
+// Cups: two bars sloping in to a gap at the bottom, rolling the ball to it, in staggered rows
+function cups(W) {
+  const out = []
+  const cup = (cx, y) => {
+    for (const side of [-1, 1]) out.push([cx + side * (18 + 24 * Math.cos(0.5)), y - 24 * Math.sin(0.5), 24, -side * 0.5])
+  }
+  const across = Math.max(2, Math.floor((W - 40) / 150))
+  for (let i = 0; i < across; i++) cup((W * (i + 0.5)) / across, 250)
+  for (let i = 1; i < across; i++) cup((W * i) / across, 420)
+  for (let r = 0, y = AREA.top; y <= AREA.bottom; r++, y += 46) {
+    for (let x = AREA.margin + (r % 2 ? 22 : 0); x <= W - AREA.margin; x += 44) out.push([x, y])
+  }
+  return out
+}
+// Long rails, sloping down one way then the other, to roll the whole way along
+function rails(W) {
+  const out = []
+  const left = AREA.margin + 10
+  const right = W - AREA.margin - 10
+  const long = (right - left) * 0.62
+  for (const [y, from] of [[250, left], [390, right - long], [520, left]]) {
+    const tilt = from === left ? 0.16 : -0.16
+    out.push([from + long / 2, y, long / 2 / Math.cos(tilt), tilt])
+  }
+  for (let r = 0, y = AREA.top; y <= AREA.bottom; r++, y += 40) {
+    for (let x = AREA.margin + (r % 2 ? 19 : 0); x <= W - AREA.margin; x += 38) out.push([x, y])
+  }
+  return out
+}
+// A funnel (one for each screen's width): two arms of bars sloping in, over a grid
+function funnel(W) {
+  const out = []
+  const n = Math.max(1, Math.round(W / 360))
+  for (let i = 0; i < n; i++) {
+    const cx = (W * (i + 0.5)) / n
+    const outer = W / n / 2 - 36
+    for (const side of [-1, 1]) {
+      const [x0, y0, x1, y1] = [cx + side * outer, 200, cx + side * 44, 400]
+      const length = Math.hypot(x1 - x0, y1 - y0)
+      const tilt = Math.atan2(y1 - y0, x1 - x0)
+      for (const t of [1 / 4, 3 / 4]) out.push([x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, length / 4 - 16, tilt])
+    }
+  }
+  for (let r = 0, y = AREA.top; y <= AREA.bottom; r++, y += 42) {
+    for (let x = AREA.margin + (r % 2 ? 22 : 0); x <= W - AREA.margin; x += 44) out.push([x, y])
+  }
+  return out
+}
+// Diamonds, each row between the one above's, a peg in the middle of each
+function diamonds(W) {
+  const out = []
+  const across = Math.max(2, Math.round((W - 40) / 150))
+  const diamond = (cx, cy) => {
+    out.push([cx, cy])
+    for (let k = 0; k < 8; k++) {
+      const a = (k * Math.PI) / 4
+      const r = 58 / (Math.abs(Math.cos(a)) + Math.abs(Math.sin(a)))
+      out.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r])
+    }
+  }
+  for (const [row, cy] of [205, 345, 485].entries()) {
+    for (let i = row % 2 ? 0 : 0.5; i <= across; i++) diamond((W * i) / across, cy)
+  }
+  for (let x = AREA.margin + 20; x <= W - AREA.margin; x += 40) out.push([x, AREA.bottom + 1])
+  return out
+}
+export const PATTERNS = [grid, ramps, waves, cups, rings, rails, arches, funnel, spiral, diamonds]
 
-// Just the ones on the board, and no two too close
-function spaced(points, W) {
+// A pattern's item as a peg's shape: its middle, half of it from end to end (dx, dy; nothing for a
+// round one), and how thick
+function shape([x, y, half = 0, tilt = 0]) {
+  return half ? { x, y, dx: Math.cos(tilt) * half, dy: Math.sin(tilt) * half, r: BAR_R } : { x, y, dx: 0, dy: 0, r: PEG_R }
+}
+// The nearest point to (x, y) on a line through a peg (from one end to the other; a round peg's just
+// its middle), with the peg's middle at (cx, cy)
+function nearest({ dx = 0, dy = 0 }, cx, cy, x, y) {
+  const length = dx * dx + dy * dy
+  const t = length ? Math.max(-1, Math.min(1, ((x - cx) * dx + (y - cy) * dy) / length)) : 0
+  return [cx + t * dx, cy + t * dy]
+}
+// How far a point is from a peg's line, a gap to its edge plus its thickness
+export function away(s, p, x, y, clock = s.clock) {
+  const [nx, ny] = nearest(p, pegX(s, p, clock), p.y, x, y)
+  return Math.hypot(x - nx, y - ny)
+}
+// The gap between two pegs, edge to edge (near enough: along the first, every few px)
+export function gap(a, b) {
+  let least = Infinity
+  for (const [p, q] of [[a, b], [b, a]]) {
+    const steps = Math.ceil(Math.hypot(p.dx ?? 0, p.dy ?? 0) / 2)
+    for (let i = -steps; i <= steps; i++) {
+      const t = steps ? i / steps : 0
+      const [x, y] = [p.x + t * (p.dx ?? 0), p.y + t * (p.dy ?? 0)]
+      const [nx, ny] = nearest(q, q.x, q.y, x, y)
+      least = Math.min(least, Math.hypot(x - nx, y - ny))
+    }
+  }
+  return least - (a.r ?? PEG_R) - (b.r ?? PEG_R)
+}
+
+// Just the ones on the board (both ends of a bar), and no two too close: room for the ball between
+function spaced(items, W) {
   const kept = []
-  for (const [x, y] of points) {
-    if (x < AREA.margin - 1 || x > W - AREA.margin + 1 || y < AREA.top - 30 || y > AREA.bottom + 1) continue
-    if (kept.every(([kx, ky]) => Math.hypot(kx - x, ky - y) >= AREA.spacing)) kept.push([x, y])
+  for (const item of items) {
+    const p = shape(item)
+    const off = (x, y) => x < AREA.margin - 1 || x > W - AREA.margin + 1 || y < AREA.top - 30 || y > AREA.bottom + 1
+    if (off(p.x - p.dx, p.y - p.dy) || off(p.x + p.dx, p.y + p.dy)) continue
+    if (kept.every((k) => gap(k, p) >= AREA.spacing - PEG_R * 2)) kept.push(p)
   }
   return kept
 }
@@ -134,9 +250,12 @@ function shuffled(n, random) {
 function level(s, random) {
   const points = spaced(PATTERNS[(s.level - 1) % PATTERNS.length](s.width), s.width)
   // Moving pegs slide in bands, each the other way to the ones above it
-  s.pegs = points.map(([x, y]) => ({
+  s.pegs = points.map(({ x, y, dx, dy, r }) => ({
     x,
     y,
+    dx,
+    dy,
+    r,
     kind: 'plain',
     lit: false,
     gone: false,
@@ -252,8 +371,9 @@ export function fire(state) {
   }
 }
 
-// Off a circle at (cx, cy) of radius r, if it's touching; true if it bounced
-function bounce(ball, cx, cy, r) {
+// Off a circle at (cx, cy) of radius r, if it's touching; true if it bounced. Met slower than
+// `roll`, it doesn't bounce at all, so it stays on (a bar) and rolls along it.
+function bounce(ball, cx, cy, r, roll = 0) {
   const reach = r + BALL_R
   const dy = ball.y - cy
   if (Math.abs(dy) >= reach) return false
@@ -265,8 +385,9 @@ function bounce(ball, cx, cy, r) {
   ball.y += ny * (reach - d)
   const along = ball.vx * nx + ball.vy * ny
   if (along >= 0) return false
-  ball.vx -= (1 + BOUNCE.peg) * along * nx
-  ball.vy -= (1 + BOUNCE.peg) * along * ny
+  const give = -along < roll ? 0 : BOUNCE.peg
+  ball.vx -= (1 + give) * along * nx
+  ball.vy -= (1 + give) * along * ny
   return true
 }
 
@@ -292,7 +413,9 @@ function move(s, ball, clock, hit) {
     ball.banked = true
   }
   for (const p of s.pegs) {
-    if (!p.gone && bounce(ball, pegX(s, p, clock), p.y, PEG_R)) hit(p)
+    if (p.gone) continue
+    const [cx, cy] = nearest(p, pegX(s, p, clock), p.y, ball.x, ball.y)
+    if (bounce(ball, cx, cy, p.r ?? PEG_R, p.dx || p.dy ? ROLL : 0)) hit(p)
   }
   const speed = Math.hypot(ball.vx, ball.vy)
   if (speed > MAX_SPEED) {
@@ -422,26 +545,29 @@ function light(s, p, ball, added) {
   // The rest of this shot, and the next three
   if (p.power === 'bucket') s.bigBucket = 4
   if (p.power === 'blast') {
-    for (const q of s.pegs) if (!q.gone && Math.hypot(pegX(s, q) - x, q.y - p.y) < BLAST) light(s, q, ball, added)
+    for (const q of s.pegs) if (!q.gone && away(s, q, x, p.y) < BLAST) light(s, q, ball, added)
   }
 }
 
 // A ball that's stopped moving, wedged between pegs or sitting on one: the pegs round it go
 function unstick(s, ball, added) {
-  const near = s.pegs.filter((p) => !p.gone && Math.hypot(pegX(s, p) - ball.x, p.y - ball.y) < BALL_R + PEG_R + 8)
+  const near = s.pegs.filter((p) => !p.gone && away(s, p, ball.x, ball.y) < BALL_R + (p.r ?? PEG_R) + 8)
   for (const p of near) {
     light(s, p, ball, added)
     p.gone = true
-    s.pops.push({ x: pegX(s, p), y: p.y, kind: p.kind, age: 0 })
+    s.pops.push(pop(s, p))
   }
   // On the bucket's rim, say: a nudge
   if (!near.length) ball.vx += ball.x < s.width / 2 ? 80 : -80
 }
 
+// A peg going, for its burst
+const pop = (s, p) => ({ x: pegX(s, p), y: p.y, dx: p.dx ?? 0, dy: p.dy ?? 0, kind: p.kind, age: 0 })
+
 // The shot's over (every ball's gone): its lit pegs go, then on to the next level, or the next shot,
 // or it's over
 function settle(s, random) {
-  for (const p of s.pegs) if (p.lit && !p.gone) s.pops.push({ x: pegX(s, p), y: p.y, kind: p.kind, age: 0 })
+  for (const p of s.pegs) if (p.lit && !p.gone) s.pops.push(pop(s, p))
   s.pegs = s.pegs.filter((p) => !p.lit && !p.gone)
   if (s.shotScore) s.labels.push({ x: s.width / 2, y: HEIGHT - 70, text: `+${s.shotScore}`, age: 0 })
   s.bigBucket = Math.max(0, s.bigBucket - 1)
