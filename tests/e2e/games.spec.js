@@ -238,6 +238,8 @@ test.describe("Plink", () => {
 test.describe("Plink: Super Aim", () => {
 	test("three taps on the score switch it on, for good, without starting the game; three more switch it off", async ({ page }) => {
 		await page.goto("/games/plink");
+		// Taps before the page has come to life would go nowhere
+		await page.waitForLoadState("networkidle");
 		const stage = page.locator(".game-stage");
 		await stage.scrollIntoViewIfNeeded();
 		const box = await stage.boundingBox();
@@ -249,6 +251,7 @@ test.describe("Plink: Super Aim", () => {
 		// Nothing changes about the board the score goes on
 		await expect(page.getByRole("button", { name: "Settings" })).toBeVisible();
 		await page.reload();
+		await page.waitForLoadState("networkidle");
 		await expect.poll(() => page.evaluate(() => localStorage.getItem("plink-superaim"))).toBe("on");
 		const again = await stage.boundingBox();
 		for (let i = 0; i < 3; i++) await page.mouse.click(again.x + again.width * 0.04, again.y + again.height * 0.03);

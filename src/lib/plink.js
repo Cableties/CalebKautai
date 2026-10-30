@@ -5,13 +5,15 @@ import { allSettingsGames, settingsGame } from './settings.js'
 // launcher's at the top: aim, and fire the ball (my head) down into a board of pegs. It bounces off
 // them under gravity, lighting each one it touches, and the lit ones go once it's off the bottom.
 // Clear every gold peg to finish the level; run out of balls first and it's over. A bucket slides
-// along the bottom: land in it for a free ball.
+// along the bottom: land in it for a free ball. A big shot (enough points in one) is a free ball
+// too.
 //
 // Each five pegs lit in a shot step its multiplier up (a combo), and trick shots add to it for the
 // rest of the shot: a long shot (a gold peg after a long flight without touching another), a bank
 // shot (a gold peg straight off a wall) and a gold combo (every third gold peg in a shot). Power-up
-// pegs (green) do their thing when they're hit: an extra ball, a blast that lights everything
-// round it, a longer aiming guide, or a bigger bucket. A pink peg is a big bonus.
+// pegs (green) do their thing when they're hit: an extra ball (dropped in from the top), a blast
+// that lights everything round it, a longer aiming guide, or a bigger bucket. A pink peg is a big
+// bonus.
 //
 // The ball moves in fixed steps (SUB seconds), and so do the moving pegs and bucket, so the aiming
 // guide (aimed()) takes exactly the path a shot fired now would.
@@ -37,6 +39,7 @@ const POINTS = { plain: 10, gold: 50, power: 25, bonus: 300 }
 const CHAIN = 5 // pegs in a shot for each step up in its multiplier
 const LONG_SHOT = 300 // how far a ball flies, touching no pegs, for a long shot
 const GOLD_COMBO = 3 // gold pegs in a shot for each gold combo
+const BIG_SHOT = 1500 // points in one shot (times the level) for a free ball
 const CLEAR_BONUS = 500 // per ball left, when a level's cleared
 const BLAST = 80 // how far round a blast lights pegs
 const SWAY = { amp: 22, speed: 0.9 } // moving pegs
@@ -174,6 +177,7 @@ export function start(
     chain: 0, // pegs lit this shot
     tricks: 0, // trick shots this shot, each adding one to its multiplier
     golds: 0, // gold pegs lit this shot
+    bigShot: false, // this shot's scored enough for a free ball
     shotScore: 0,
     longAim: 0, // shots left with the long aiming guide
     bigBucket: 0, // shots left with the big bucket
@@ -241,6 +245,7 @@ export function fire(state) {
     chain: 0,
     tricks: 0,
     golds: 0,
+    bigShot: false,
     shotScore: 0,
     longAim: Math.max(0, state.longAim - 1),
     fired: true,
@@ -355,6 +360,34 @@ function touch(s, p, ball, added) {
   light(s, p, ball, added)
 }
 
+const ballAt = (x, y, vx = 0, vy = 0) => ({ x, y, vx, vy, ax: x, ay: y, still: 0, flown: 0, banked: false })
+
+// The extra ball from the power-up, dropped in from the top over a peg it's sure to hit: one not
+// lit yet (gold first, then the furthest from the ball that found the power-up), checked by
+// dropping a ball there ahead of time. Moving pegs and all, it'll go exactly the same way.
+function dropped(s, from) {
+  const y = HUD + BALL_R + 1
+  const over = (p) => {
+    const x = pegX(s, p)
+    // Just off its middle, so it doesn't balance there
+    return Math.max(BALL_R, Math.min(s.width - BALL_R, x + (x < s.width / 2 ? 3 : -3)))
+  }
+  const candidates = s.pegs
+    .filter((p) => !p.gone && !p.lit)
+    .sort((a, b) => (b.kind === 'gold') - (a.kind === 'gold') || Math.abs(pegX(s, b) - from.x) - Math.abs(pegX(s, a) - from.x))
+  for (const p of candidates.slice(0, 12)) {
+    const trial = ballAt(over(p), y)
+    let hits = false
+    let clock = s.clock
+    for (let i = 0; i < 3 / SUB && !hits; i++) {
+      clock += SUB
+      if (move(s, trial, clock, (q) => (hits ||= !q.lit))) break
+    }
+    if (hits) return ballAt(over(p), y)
+  }
+  return candidates.length ? ballAt(over(candidates[0]), y) : ballAt(from.x, from.y, -from.vx || 120, from.vy)
+}
+
 function light(s, p, ball, added) {
   if (p.lit) return
   p.lit = true
@@ -368,6 +401,12 @@ function light(s, p, ball, added) {
   const points = POINTS[p.kind] * s.level * multiplier(s)
   s.score += points
   s.shotScore += points
+  // A big shot: a free ball (once a shot)
+  if (!s.bigShot && s.shotScore >= BIG_SHOT * s.level) {
+    s.bigShot = true
+    s.balls++
+    s.labels.push({ x: s.width / 2, y: HEIGHT / 2 + 30, text: 'Big shot! Free ball', age: 0 })
+  }
   // What the sound's for: gold over the rest
   if (s.hit !== 'gold') s.hit = p.kind
   if (p.kind === 'gold' && !s.pegs.some((q) => q.kind === 'gold' && !q.lit)) {
@@ -378,7 +417,7 @@ function light(s, p, ball, added) {
   if (p.kind !== 'power') return
   s.labels.push({ x, y: p.y, text: POWERS[p.power], age: 0 })
   s.powered = p.power
-  if (p.power === 'multi') added.push({ ...ball, vx: -ball.vx || 120, ax: ball.x, ay: ball.y, still: 0, flown: 0, banked: false })
+  if (p.power === 'multi') added.push(dropped(s, ball))
   if (p.power === 'aim') s.longAim = 3
   // The rest of this shot, and the next three
   if (p.power === 'bucket') s.bigBucket = 4

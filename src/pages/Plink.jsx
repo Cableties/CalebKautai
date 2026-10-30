@@ -46,6 +46,9 @@ const INK = '#2e2a45'
 const SUPER = { taps: 3, window: 1500, key: 'plink-superaim' } // taps on the score, within ms
 const SCORE_BOX = { width: 120 } // where the score is, in the strip at the top
 const DRAG = 0.012 // radians the aim turns per pixel a finger drags (a 100px drag: about 70°)
+// A tap of an arrow key nudges the aim this much (radians: about half a degree); held this long
+// (ms), it turns steadily
+const NUDGE = { by: 0.01, hold: 250 }
 const PEGS = { gold: '#f5b937', power: '#5cc97a', bonus: '#f05d8a' } // plain ones are the level's colour
 // Each level its own scene, going round, fading from one to the next. `peg`: the plain pegs; `dots`:
 // the aim and writing on the board; `far` and `near`: the hills along the bottom. The numbers fade
@@ -616,13 +619,24 @@ export default function Plink() {
       const which = LEFT_KEYS.includes(e.key) ? 'left' : RIGHT_KEYS.includes(e.key) ? 'right' : null
       if (!which) return
       e.preventDefault()
-      input.current = { ...input.current, [which]: pressed }
+      // A tap nudges it; held on, it turns (the key's own repeats ignored)
+      clearTimeout(holds[which])
+      if (!pressed) {
+        input.current = { ...input.current, [which]: false }
+        return
+      }
+      if (e.repeat || phaseRef.current !== 'playing') return
+      game.current = turn(game.current, which === 'left' ? -NUDGE.by : NUDGE.by)
+      holds[which] = setTimeout(() => (input.current = { ...input.current, [which]: true }), NUDGE.hold)
     }
+    const holds = {}
     addEventListener('keydown', key)
     addEventListener('keyup', key)
     return () => {
       removeEventListener('keydown', key)
       removeEventListener('keyup', key)
+      clearTimeout(holds.left)
+      clearTimeout(holds.right)
     }
   }, [])
 

@@ -224,3 +224,41 @@ test('plink: aiming through a point (the mouse), the ball drops right through it
   const s = plink.aimThrough(plink.start({ width: 840 }, first), 830, 50)
   assert.ok(s.aim > 1.5)
 })
+
+test('plink: a big shot (1,500 points a level, in one shot) is a free ball, once a shot', () => {
+  // The first level's board, every peg pink (300 each): plenty for one shot
+  const pegs = plink.start({}, first).pegs.map(({ x, y }) => ({ x, y, kind: 'bonus' }))
+  let s = plink.fire(board(pegs, { bucket: false, aim: 0.2 }))
+  assert.equal(s.balls, 9)
+  s = playOut(s)
+  assert.ok(s.score >= 3000, `${s.score}`)
+  assert.equal(s.balls, 10)
+})
+
+test('plink: the extra ball drops in from the top, always onto a peg not lit yet, moving pegs and all', () => {
+  for (let i = 0; i < 40; i++) {
+    let s = plink.start({ moving: i % 2 === 1, nobucket: true }, Math.random)
+    s = plink.step(s, Math.random() * 5, {})
+    // The power-up straight under the launcher
+    s.pegs.push({ x: plink.WIDTH / 2, y: 110, kind: 'power', power: 'multi', lit: false, gone: false, sway: 0 })
+    s = plink.fire({ ...s, aim: 0 })
+    let extra = null
+    for (let n = 0; n < 2000 && s.inPlay.length; n++) {
+      const was = s.pegs.map((p) => p.lit) // lit before this step (pegs stay put, by index, till the shot's over)
+      s = plink.step(s, 1 / 240, {})
+      if (!extra && s.inPlay.length === 2) {
+        extra = s.inPlay[1]
+        assert.ok(extra.y < plink.HUD + 20, `starts at the top: ${extra.y}`)
+      }
+      // Once it's there, wait for it to light a peg
+      if (extra && s.inPlay.length === 2) {
+        const now = s.pegs.filter((p, k) => p.lit && !was[k])
+        if (now.some((p) => Math.abs(plink.pegX(s, p) - s.inPlay[1].x) < 20)) {
+          extra = 'hit'
+          break
+        }
+      }
+    }
+    assert.equal(extra, 'hit')
+  }
+})
