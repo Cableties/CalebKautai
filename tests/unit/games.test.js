@@ -130,6 +130,10 @@ test('scores: a score has to be reachable in the time the run took', () => {
   assert.ok(at(2 * 60 * 60 * 1000, 10).error)
   assert.ok(at(ROUND_MS + 500, 10, 'flappy-head', bonkRun).error)
   assert.ok(at(15_000, 10, 'flappy-head', null).error)
+  // Plink's points grow with the level, so a big score is a long game: it has a day, not an hour
+  const plinkRun = startRun('plink', NOW, SECRET)
+  assert.ok(at(90 * 60 * 1000, 10_599_905, 'plink', plinkRun).entry)
+  assert.ok(at(25 * 60 * 60 * 1000, 10_599_905, 'plink', plinkRun).error)
 })
 
 test('scores: rejects unknown games and odd scores', () => {

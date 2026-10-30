@@ -221,3 +221,13 @@ test.describe('bouncing head on the good friend page', () => {
     await expect(page.locator('.bounce-head')).toHaveCount(0)
   })
 })
+
+test('the tab icon and home-screen icon are there and load', async ({ page, request }) => {
+  await page.goto('/')
+  for (const selector of ['link[rel="icon"][type="image/svg+xml"]', 'link[rel="icon"][type="image/png"]', 'link[rel="apple-touch-icon"]']) {
+    const href = await page.locator(selector).getAttribute('href')
+    const response = await request.get(href)
+    expect(response.ok(), href).toBe(true)
+    expect(response.headers()['content-type']).toMatch(/^image\//)
+  }
+})

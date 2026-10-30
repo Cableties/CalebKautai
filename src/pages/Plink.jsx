@@ -46,9 +46,9 @@ const INK = '#2e2a45'
 const SUPER = { taps: 3, window: 1500, key: 'plink-superaim' } // taps on the score, within ms
 const SCORE_BOX = { width: 120 } // where the score is, in the strip at the top
 const DRAG = 0.012 // radians the aim turns per pixel a finger drags (a 100px drag: about 70°)
-// A tap of an arrow key nudges the aim this much (radians: about half a degree); held this long
-// (ms), it turns steadily
-const NUDGE = { by: 0.01, hold: 250 }
+// A tap of an arrow key nudges the aim this much (radians: a sixth of a degree, so the aim's first
+// peg, about 300px away, moves about a pixel); held this long (ms), it turns steadily
+const NUDGE = { by: 0.003, hold: 250 }
 const PEGS = { gold: '#f5b937', power: '#5cc97a', bonus: '#f05d8a' } // plain ones are the level's colour
 // Each level its own scene, going round, fading from one to the next. `peg`: the plain pegs; `dots`:
 // the aim and writing on the board; `far` and `near`: the hills along the bottom. The numbers fade
@@ -233,7 +233,12 @@ function backdrop(ctx, W, theme, time) {
 }
 
 function ball(ctx, looks, head, x, y, facing, time) {
-  // A plain ball under the head, in case the head's picture hasn't loaded
+  // A plain ball until the head's picture has loaded (after that it would peek out round a narrower
+  // face, like Amber's)
+  if (head?.sheet.complete && head.sheet.naturalWidth) {
+    looks.draw(ctx, head, { x, y, size: BALL_R * 2.6, facing, time })
+    return
+  }
   ctx.fillStyle = '#fff'
   ctx.strokeStyle = INK
   ctx.lineWidth = 2
@@ -241,7 +246,6 @@ function ball(ctx, looks, head, x, y, facing, time) {
   ctx.arc(x, y, BALL_R, 0, Math.PI * 2)
   ctx.fill()
   ctx.stroke()
-  looks.draw(ctx, head, { x, y, size: BALL_R * 2.6, facing, time })
 }
 
 // `level`: which level's look, fading from one to the next as each is cleared

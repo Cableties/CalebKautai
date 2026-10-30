@@ -12,6 +12,9 @@ import { PLINK_GAMES, POINTS_PER_SECOND as PLINK_POINTS_PER_SECOND } from '../..
 import { ROWS, SECONDS_PER_SNACK, SNAKE_GAMES, WIDE_COLS } from '../../src/lib/snake.js'
 
 const HOUR = 60 * 60 * 1000
+// A run is good for this long, unless its game says otherwise (`maxMs`), so an old one can't be kept
+// and reused
+const LONGEST = HOUR
 // The same rules for every board of a game (one per mix of its settings: lib/settings.js)
 const boards = (games, rules) => Object.fromEntries(games.map((g) => [g, rules]))
 export const GAMES = {
@@ -29,8 +32,9 @@ export const GAMES = {
   ...boards(BRICKS_GAMES, { minMs: (score) => (score / BRICK_POINTS_PER_SECOND) * 1000, max: 1_000_000 }),
   // None faster than a whole board dropping off every shot
   ...boards(BUBBLES_GAMES, { minMs: (score) => (score / BUBBLE_POINTS_PER_SECOND) * 1000, max: 10_000_000 }),
-  // None faster than a long chain of bonus pegs non-stop
-  ...boards(PLINK_GAMES, { minMs: (score) => (score / PLINK_POINTS_PER_SECOND) * 1000, max: 1_000_000_000 }),
+  // None faster than a long chain of bonus pegs non-stop. Points grow with the level, so a big score
+  // means a long game, well over an hour (and it can be paused): a day to finish it.
+  ...boards(PLINK_GAMES, { minMs: (score) => (score / PLINK_POINTS_PER_SECOND) * 1000, max: 1_000_000_000, maxMs: 24 * HOUR }),
   // A board per pinball table, none faster than a ball pinging between bumpers non-stop
   ...Object.fromEntries(
     TABLES.map((t) => [`pinball-${t.id}`, { minMs: (score) => (score / POINTS_PER_SECOND) * 1000, max: 10_000_000 }]),
@@ -70,7 +74,7 @@ export function parseScore(body, now, secret) {
   const score = Number(body.score)
   if (!Number.isInteger(score) || score < 1 || score > rules.max) return { error: "That score doesn't look right." }
   const started = runStart(body.game, body.run, secret)
-  if (started == null || now - started > HOUR || now - started < rules.minMs(score)) {
+  if (started == null || now - started > (rules.maxMs ?? LONGEST) || now - started < rules.minMs(score)) {
     return { error: "That score doesn't look right." }
   }
   return { entry: { game: body.game, initials, score } }
