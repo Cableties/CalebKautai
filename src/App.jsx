@@ -14,6 +14,7 @@ import Bonk from './pages/Bonk.jsx'
 import Bricks from './pages/Bricks.jsx'
 import Bubbles from './pages/Bubbles.jsx'
 import Plink from './pages/Plink.jsx'
+import Headcount from './pages/Headcount.jsx'
 import FlappyHead from './pages/FlappyHead.jsx'
 import Games from './pages/Games.jsx'
 import GuestbookAdmin from './pages/GuestbookAdmin.jsx'
@@ -49,6 +50,7 @@ export default function App() {
         <Route path="games/bricks" element={<Bricks />} />
         <Route path="games/bubbles" element={<Bubbles />} />
         <Route path="games/plink" element={<Plink />} />
+        <Route path="games/headcount" element={<Headcount />} />
         <Route path="cotg-submission" element={<Placeholder title="CoTG" blurb="Submissions aren't open yet. When they are, this is where they'll go." />} />
         <Route path="*" element={<NotFound />} />
       </Route>

@@ -178,6 +178,12 @@ export const games = [
 		icon: "🟡",
 		note: "Fire my head into the pegs. Clear the gold ones, and catch it in the bucket for another go.",
 	},
+	{
+		to: "/games/headcount",
+		label: "Headcount",
+		icon: "🪦",
+		note: "Ghouls close in on my head. Knock them down, then raise their graves to fight on your side.",
+	},
 ];
 
 export const thingsToDo = [
@@ -209,7 +215,7 @@ export const thingsToDo = [
 	{
 		to: "/games",
 		label: "Games",
-		note: "Flappy Head, Bonk, pinball, Snake, Invaders, Bricks, Bubbles and Plink. Get your initials on the high scores.",
+		note: "Flappy Head, Bonk, pinball, Snake, Invaders, Bricks, Bubbles, Plink and Headcount. Get your initials on the high scores.",
 	},
 	{
 		to: "/find-me",
@@ -298,6 +304,10 @@ export const pageMeta = {
 	"/games/plink": {
 		title: "Plink",
 		description: "Fire Caleb's head down into a board of pegs. Clear the gold ones before the balls run out.",
+	},
+	"/games/headcount": {
+		title: "Headcount",
+		description: "Ghouls close in on Caleb's head. Knock them down, raise their graves, and grow an army of your own.",
 	},
 	"/games/invaders": {
 		title: "Invaders",

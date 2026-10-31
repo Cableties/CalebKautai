@@ -79,8 +79,9 @@ export function ScoreBoard({ game, scores: given }) {
 }
 
 // After a game: put a score on the board with three initials. Not for an `easy` one (played with
-// the secret Easy Mode cheat on), which wouldn't be fair on everyone else.
-export function ScoreEntry({ game, score, run, easy = false, onSaved }) {
+// the secret Easy Mode cheat on, or another: `cheat` names it), which wouldn't be fair on everyone
+// else.
+export function ScoreEntry({ game, score, run, easy = false, cheat = 'Easy mode', onSaved }) {
   const [initials, setInitials] = useState('')
   const [status, setStatus] = useState('idle') // idle | sending | saved | error
   const [message, setMessage] = useState('')
@@ -108,7 +109,7 @@ export function ScoreEntry({ game, score, run, easy = false, onSaved }) {
   if (easy && score)
     return (
       <p className="score-saved" role="status">
-        Easy mode was on, so this one's just for you.
+        {cheat} was on, so this one's just for you.
       </p>
     )
   // No run token means the scores API isn't there (local dev, or the database is off)

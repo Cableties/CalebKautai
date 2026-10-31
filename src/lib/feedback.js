@@ -128,6 +128,14 @@ export const EFFECTS = {
     buzz: [60, 40, 90],
   },
   wave: { notes: [392, 523, 659, 784].map((from, i) => ({ wave: 'triangle', from, ms: 110, gain: 0.35, delay: i * 70 })) },
+  // Headcount: a ghostly swell as the graves rise
+  rise: {
+    notes: [
+      { wave: 'sine', from: 220, to: 660, ms: 320, gain: 0.45 },
+      { wave: 'triangle', from: 330, to: 990, ms: 260, gain: 0.25, delay: 60 },
+    ],
+    buzz: [15, 30, 15],
+  },
 }
 
 export function feedback(name) {

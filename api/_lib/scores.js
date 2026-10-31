@@ -6,6 +6,7 @@ import { BONK_GAMES, MAX_SCORE as BONK_MAX, ROUND_MS } from '../../src/lib/bonk.
 import { BRICKS_GAMES, POINTS_PER_SECOND as BRICK_POINTS_PER_SECOND } from '../../src/lib/bricks.js'
 import { BUBBLES_GAMES, POINTS_PER_SECOND as BUBBLE_POINTS_PER_SECOND } from '../../src/lib/bubbles.js'
 import { FLAPPY_GAMES, SECONDS_PER_PIPE } from '../../src/lib/flappy.js'
+import { HEADCOUNT_GAMES, POINTS_PER_SECOND as HEADCOUNT_POINTS_PER_SECOND } from '../../src/lib/headcount.js'
 import { INVADERS_GAMES, POINTS_PER_SECOND as INVADER_POINTS_PER_SECOND } from '../../src/lib/invaders.js'
 import { POINTS_PER_SECOND, TABLES } from '../../src/lib/pinball.js'
 import { PLINK_GAMES, POINTS_PER_SECOND as PLINK_POINTS_PER_SECOND } from '../../src/lib/plink.js'
@@ -35,6 +36,9 @@ export const GAMES = {
   // None faster than a long chain of bonus pegs non-stop. Points grow with the level, so a big score
   // means a long game, well over an hour (and it can be paused): a day to finish it.
   ...boards(PLINK_GAMES, { minMs: (score) => (score / PLINK_POINTS_PER_SECOND) * 1000, max: 1_000_000_000, maxMs: 24 * HOUR }),
+  // None faster than a stream of late brutes non-stop. Points grow with the wave, so a big score is a
+  // long game, as Plink's are: a day to finish it.
+  ...boards(HEADCOUNT_GAMES, { minMs: (score) => (score / HEADCOUNT_POINTS_PER_SECOND) * 1000, max: 1_000_000_000, maxMs: 24 * HOUR }),
   // A board per pinball table, none faster than a ball pinging between bumpers non-stop
   ...Object.fromEntries(
     TABLES.map((t) => [`pinball-${t.id}`, { minMs: (score) => (score / POINTS_PER_SECOND) * 1000, max: 10_000_000 }]),

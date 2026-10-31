@@ -22,7 +22,7 @@ test("the games page lists the games, and the menu leads there", async ({
 	await expect(
 		page.getByRole("heading", { name: "Bonk", level: 1 }),
 	).toBeVisible();
-	for (const name of ["Snake", "Invaders", "Bricks", "Bubbles", "Plink"]) {
+	for (const name of ["Snake", "Invaders", "Bricks", "Bubbles", "Plink", "Headcount"]) {
 		await page.getByRole("link", { name: "← All games" }).click();
 		await page.getByRole("link", { name: new RegExp(name) }).click();
 		await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
@@ -235,6 +235,29 @@ test.describe("Plink", () => {
 	});
 });
 
+test.describe("Headcount", () => {
+	test("a key starts it, the ghouls come, and my head knocks them down for points", async ({ page }) => {
+		await page.goto("/games/headcount");
+		await page.keyboard.press(" ");
+		await expect(page.getByText("Tap to start")).toBeHidden();
+		await expect(page.getByRole("img", { name: /Headcount. Wave 1. Score: [1-9]/ })).toBeVisible({
+			timeout: 15000,
+		});
+	});
+
+	test("a right-click doesn't open the menu over the arena", async ({ page }) => {
+		await page.goto("/games/headcount");
+		const stage = page.locator(".game-stage");
+		await stage.scrollIntoViewIfNeeded();
+		const prevented = await stage.evaluate((el) => {
+			const e = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+			el.dispatchEvent(e);
+			return e.defaultPrevented;
+		});
+		expect(prevented).toBe(true);
+	});
+});
+
 test.describe("Plink: Super Aim", () => {
 	test("three taps on the score switch it on, for good, without starting the game; three more switch it off", async ({ page }) => {
 		await page.goto("/games/plink");
@@ -321,6 +344,30 @@ test.describe("Flappy Head", () => {
 			await page.waitForTimeout(150);
 		}
 		await expect(page.getByRole("heading", { name: "Splat!" })).toHaveCount(0);
+	});
+
+	test("tapping the score three times turns on auto flap, which plays itself, and the game doesn't count", async ({
+		page,
+	}) => {
+		test.setTimeout(30_000);
+		await page.goto("/games/flappy-head");
+		const stage = page.locator(".game-stage");
+		const box = await stage.boundingBox();
+		// The score's at the top, in the middle
+		const score = { x: box.width / 2, y: box.height * (70 / 640) };
+		for (let i = 0; i < 3; i++) await stage.click({ position: score });
+		// Hands off: it's still going past a few pipes later
+		await expect(
+			page.getByRole("img", { name: /Flappy Head. Score: [3-9]/ }),
+		).toBeVisible({ timeout: 15_000 });
+		await expect(page.getByRole("heading", { name: "Splat!" })).toHaveCount(0);
+		// Three more turn it off, and without flapping it falls
+		for (let i = 0; i < 3; i++) await stage.click({ position: score });
+		await expect(page.getByRole("heading", { name: "Splat!" })).toBeVisible({
+			timeout: 5000,
+		});
+		await expect(page.getByText("Auto flap was on")).toBeVisible();
+		await expect(page.getByLabel("Your initials")).toHaveCount(0);
 	});
 });
 
@@ -563,6 +610,7 @@ test.describe("tap feedback", () => {
 		["/games/bricks", ".game-stage"],
 		["/games/bubbles", ".game-stage"],
 		["/games/plink", ".game-stage"],
+		["/games/headcount", ".game-stage"],
 	]) {
 		test(`${path}: no blue flash on a tap`, async ({ page, browserName }) => {
 			// Only Chromium's test build reports the tap highlight

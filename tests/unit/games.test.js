@@ -57,6 +57,26 @@ test('flappy: hitting a pipe ends it', () => {
   assert.equal(flappy.step(s, 1 / 60, half).dead, true)
 })
 
+test('flappy: auto flap plays itself through random pipes, with any of the settings, keeping to a plan', () => {
+  // The same random pipes every time
+  const seeded = (seed) => () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
+  for (const settings of [{}, { moving: true }, { moon: true }, { radius: RADIUS * 1.6 }, { width: 840 }]) {
+    for (const seed of [1, 2, 3]) {
+      const random = seeded(seed)
+      let s = flappy.start(settings, random)
+      let plan = null
+      for (let i = 0; i < 60 * 60 && !s.dead; i++) {
+        const next = flappy.autoFlap(s, plan)
+        plan = next.plan
+        s = flappy.step(next.flap ? flappy.flap(s) : s, 1 / 60, random)
+      }
+      assert.equal(s.dead, false, `${JSON.stringify(settings)}, seed ${seed}: crashed at ${s.score}`)
+      assert.ok(s.score >= 35)
+    }
+  }
+  assert.deepEqual(flappy.autoFlap({ ...flappy.start({}, half), dead: true }), { flap: false, plan: null })
+})
+
 test('flappy: gaps narrow as the score goes up, but not forever', () => {
   assert.ok(flappy.gapFor(10) < flappy.gapFor(0))
   assert.equal(flappy.gapFor(1000), flappy.gapFor(2000))
@@ -153,7 +173,7 @@ test('scores: the board reads Upstash member/score pairs', () => {
 })
 
 test("scores: every mix of a game's settings has a board, and Bonk Frenzy can go twice as high", () => {
-  for (const game of ['flappy-head-moving-moon', 'bonk-decoys', 'snake-wrap-obstacles-portals', 'invaders-rapid', 'bricks-nopowers-small', 'plink-nobucket-moving']) {
+  for (const game of ['flappy-head-moving-moon', 'bonk-decoys', 'snake-wrap-obstacles-portals', 'invaders-rapid', 'bricks-nopowers-small', 'plink-nobucket-moving', 'headcount-swarm-fragile']) {
     assert.ok(GAMES[game], game)
   }
   assert.equal(GAMES['bonk-frenzy'].max, GAMES.bonk.max * 2)

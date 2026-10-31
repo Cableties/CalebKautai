@@ -65,6 +65,7 @@ export function start({ radius = RADIUS, easy = false, moving = false, moon = fa
     moon,
     score: 0,
     dead: false,
+    travelled: 0, // how far the pipes have scrolled
     pipes: [pipe(width + 80, 0, random, easy, moving)],
   }
 }
@@ -109,7 +110,99 @@ export function step(state, dt, random = Math.random) {
         hits(HEAD_X, y, r, p.x, -1000, PIPE_WIDTH, p.gapY - p.gap / 2 + 1000) ||
         hits(HEAD_X, y, r, p.x, p.gapY + p.gap / 2, PIPE_WIDTH, HEIGHT),
     )
-  return { ...state, y: crashed ? Math.min(y, HEIGHT - GROUND - r) : y, vy: climbing ? 0 : vy, score, pipes, dead: crashed }
+  const travelled = (state.travelled ?? 0) + SPEED * dt
+  return { ...state, y: crashed ? Math.min(y, HEIGHT - GROUND - r) : y, vy: climbing ? 0 : vy, score, pipes, travelled, dead: crashed }
+}
+
+// Auto flap (a cheat: tap the score three times): whether to flap now, and the plan to hand back
+// next frame ({ flap, plan }). It plans its way past the next PLAN.pipes pipes, a frame at a time,
+// with the game's own rules (and a little to spare): after each flap the head falls till the next,
+// so a plan is just when to flap (how far along: `travelled`), as late as it can. It keeps to its
+// plan while the plan still works and reaches past the next pipe, and plans again (from the old one)
+// when it doesn't.
+// Seconds a frame, pixels to spare, how many pipes ahead, and flaps tried at most (so a frame never
+// takes long)
+const PLAN = { dt: 1 / 60, spare: 3, pipes: 2, tries: 1e9 }
+export function autoFlap(state, plan = null) {
+  if (state.dead) return { flap: false, plan: null }
+  const { dt } = PLAN
+  const travelled = state.travelled ?? 0
+  const frameOf = (at) => Math.round((at - travelled) / (SPEED * dt))
+  const gravity = GRAVITY * (state.easy ? EASY.gravity : 1) * (state.moon ? MOON.gravity : 1)
+  const up = FLAP * (state.moon ? MOON.flap : 1)
+  const fall = (y, vy) => {
+    vy = Math.min(MAX_FALL, vy + gravity * dt)
+    y += vy * dt
+    return y < state.radius ? [state.radius, 0] : [y, vy]
+  }
+  const ahead = state.pipes.filter((p) => p.x + PIPE_WIDTH > HEAD_X - state.radius)
+  const past = (p) => Math.max(1, Math.ceil((p.x + PIPE_WIDTH - HEAD_X + state.radius) / (SPEED * dt)) + 2) // frames till it's past
+  const frames = past(ahead[PLAN.pipes - 1] ?? ahead.at(-1) ?? state.pipes.at(-1))
+  const enough = frames - 2 // how far a plan has to reach, to keep to it: past every pipe it should see
+  const length = Math.max(frames, plan ? frameOf(plan.until) : 0)
+  // Each frame ahead: the opening the head has to be in, if a pipe's there
+  const openings = Array.from({ length }, (_, k) => {
+    let [top, bottom] = [-Infinity, Infinity]
+    for (const p of state.pipes) {
+      const x = p.x - SPEED * dt * (k + 1)
+      if (x > HEAD_X + state.radius + 4 || x + PIPE_WIDTH < HEAD_X - state.radius - 4) continue
+      const { gapY, gap } = drift({ ...p, x })
+      ;[top, bottom] = [Math.max(top, gapY - gap / 2), Math.min(bottom, gapY + gap / 2)]
+    }
+    return [top, bottom]
+  })
+  const safe = (k, y, r) => y + r < HEIGHT - GROUND && y - r > openings[k][0] && y + r < openings[k][1]
+  // The plan's flaps, as frames from now (any it's fallen behind on, now)
+  const planned = plan ? plan.flaps.map((at) => Math.max(0, frameOf(at))) : []
+  // Its flaps from here: what it does now, and the plan without this one
+  const go = (flaps, until) => ({
+    flap: flaps.includes(0),
+    plan: { flaps: flaps.filter((k) => k > 0).map((k) => travelled + k * SPEED * dt), until },
+  })
+
+  // Does the old plan still get it to its end, from here?
+  let holds = false
+  if (plan && frameOf(plan.until) >= 1) {
+    let [y, vy] = [state.y, state.vy]
+    holds = true
+    for (let k = 0; k < frameOf(plan.until) && holds; k++) {
+      ;[y, vy] = fall(y, planned.includes(k) ? up : vy)
+      holds = safe(k, y, state.radius + 1)
+    }
+    if (holds && frameOf(plan.until) >= enough) return go(planned, plan.until)
+  }
+
+  for (const spare of [PLAN.spare, 0]) {
+    const r = state.radius + spare
+    const failed = new Set() // flaps (frame, height) known to lead nowhere
+    let tries = PLAN.tries
+    // From frame k at (y, vy), flapping now or not: the frames to flap at to get through, if any
+    function through(k, y, vy, flapping) {
+      const key = flapping && `${k}:${Math.round(y / 2)}`
+      if (tries-- <= 0 || (key && failed.has(key))) return null
+      const path = [] // the heights it falls through, to flap from
+      for (let j = k; j < frames; j++) {
+        ;[y, vy] = fall(y, flapping && j === k ? up : vy)
+        if (!safe(j, y, r)) break
+        path.push([y, vy])
+        if (j === frames - 1) return flapping ? [k] : []
+      }
+      // Where the old plan flapped first, then as late as it can
+      const order = path.map((_, i) => i).reverse()
+      order.sort((a, b) => planned.includes(k + b + 1) - planned.includes(k + a + 1))
+      for (const i of order) {
+        const rest = through(k + i + 1, path[i][0], path[i][1], true)
+        if (rest) return flapping ? [k, ...rest] : rest
+      }
+      if (key) failed.add(key)
+      return null
+    }
+    const flaps = through(0, state.y, state.vy, false) ?? through(0, state.y, state.vy, true)
+    if (flaps) return go(flaps, travelled + frames * SPEED * dt)
+  }
+  // No way through found: keep to the old plan while it lasts, or else flap in the bottom half
+  if (holds) return go(planned, plan.until)
+  return { flap: state.y > HEIGHT / 2, plan: null }
 }
 
 // Which way the face points (degrees, 0 = right, 90 = down): nose up after a flap, down in a dive

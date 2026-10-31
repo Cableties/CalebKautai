@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { HEADS } from '../lib/bounce.js'
 import { cheatOn, gameHead } from '../lib/gameHead.js'
-import { GROUND, HEAD_X, HEIGHT, PIPE_WIDTH, RADIUS, SETTINGS, SPACING, SPEED, WIDTH, facing, flap, flappyGame, start, step } from '../lib/flappy.js'
+import { GROUND, HEAD_X, HEIGHT, PIPE_WIDTH, RADIUS, SETTINGS, SPACING, SPEED, WIDTH, autoFlap, facing, flap, flappyGame, start, step } from '../lib/flappy.js'
 import { mix, themeAt } from '../lib/themes.js'
 import { ScoreBoard, ScoreEntry, useBest, useRun } from '../components/Scores.jsx'
 import { useGameSettings, useSettingsPanel } from '../components/GameSettings.jsx'
@@ -18,6 +18,9 @@ import { useCheats } from '../components/Cheats.jsx'
 //
 // The further it gets, the more the world changes round it: every few pipes a new place (a meadow,
 // a city, a desert, a forest, snowy mountains), and the sun going down and coming back up as it goes.
+//
+// A secret: tap the score three times quickly and it plays itself (auto flap, lib/flappy.js). Three
+// more turn it off. A game it's been on for doesn't count towards the high scores.
 const COLOURS = {
   pipes: ['#f7b6d2', '#a9d4f2', '#d9ccf5', '#fdeca0'],
   outline: '#2e2a45',
@@ -32,6 +35,8 @@ const PLACES = [
   { scenery: 'snow', skyTop: '#d6e4f4', skyBottom: '#f3f5fb', far: '#bccbe2', near: '#e6edf7', accent: '#ffffff', ground: '#eef3fa', groundStripe: '#dbe4f0' },
 ]
 const PIPES_PER_PLACE = 10
+// Where the score is, to tap (round its middle, at the top), and how quick the three taps have to be
+const SCORE_TAP = { halfWidth: 70, top: 20, bottom: 100, within: 1200 }
 // The time of day, going round: how much its sky takes over from the place's own (`amount`), how
 // dark it is (`night`), and where the sun and moon are (down behind the scenery when they're out
 // of the sky)
@@ -211,7 +216,8 @@ const CLOUDS = [
   [330, 60, 18],
 ]
 
-function draw(ctx, game, head, looks, distance, journey, puffs, time, scroll) {
+// `auto`: auto flap's on, so it says so under the score
+function draw(ctx, game, head, looks, distance, journey, puffs, time, scroll, auto) {
   const W = game.width // the world's width: wider on a desktop
   const { place, time: day } = world(journey)
   const p = place.palette
@@ -340,6 +346,13 @@ function draw(ctx, game, head, looks, distance, journey, puffs, time, scroll) {
   ctx.strokeText(String(game.score), W / 2, 84)
   ctx.fillStyle = '#fff'
   ctx.fillText(String(game.score), W / 2, 84)
+  if (auto) {
+    ctx.font = '800 15px system-ui, sans-serif'
+    ctx.lineWidth = 5
+    ctx.strokeText('AUTO', W / 2, 108)
+    ctx.fillStyle = '#fdeca0'
+    ctx.fillText('AUTO', W / 2, 108)
+  }
 }
 
 export default function FlappyHead() {
@@ -375,15 +388,24 @@ export default function FlappyHead() {
   const distance = useRef(0)
   const journey = useRef(0) // how far this run's gone, for the places and the time of day
   const frameTime = useRef(0) // the animation's clock, in seconds, so puffs age in step with it
+  const auto = useRef(false) // auto flap's on (it plays itself)
+  const plan = useRef(null) // auto flap's plan, from one frame to the next
+  const scoreTaps = useRef([]) // when the score was last tapped (ms)
+  const [autoUsed, setAutoUsed] = useState(false) // this game, so it can't go on the board
 
+  // A game auto flap's been on for is marked (`auto`), so it doesn't count
   const fresh = () => {
     setBoardWide(wideRef.current)
-    return start({
-      ...settingsRef.current,
-      radius: RADIUS * (cheatOn('bighead') ? 1.6 : 1),
-      easy: cheatOn('easy'),
-      width: wideRef.current ? WIDE_WIDTH : WIDTH,
-    })
+    plan.current = null
+    return {
+      ...start({
+        ...settingsRef.current,
+        radius: RADIUS * (cheatOn('bighead') ? 1.6 : 1),
+        easy: cheatOn('easy'),
+        width: wideRef.current ? WIDE_WIDTH : WIDTH,
+      }),
+      auto: auto.current,
+    }
   }
 
   // New settings (or the saved ones, once they load): ready to go with them, and their scores
@@ -425,7 +447,13 @@ export default function FlappyHead() {
       last = now
       if (phaseRef.current === 'playing') {
         const before = game.current
-        game.current = step(before, dt)
+        let now = before
+        if (auto.current) {
+          const next = autoFlap(before, plan.current)
+          plan.current = next.plan
+          if (next.flap) now = flapNow(before)
+        }
+        game.current = step(now, dt)
         distance.current += SPEED * dt
         journey.current += SPEED * dt
         if (game.current.score !== before.score) {
@@ -435,7 +463,8 @@ export default function FlappyHead() {
         if (game.current.dead) {
           feedback('splat')
           setPhase('over')
-          setNewBest(!game.current.easy && recordRef.current(game.current.score))
+          setAutoUsed(!!game.current.auto)
+          setNewBest(!game.current.easy && !game.current.auto && recordRef.current(game.current.score))
         }
       } else if (phaseRef.current === 'ready') {
         // Bob gently while waiting to start
@@ -446,7 +475,7 @@ export default function FlappyHead() {
       frameTime.current = now / 1000
       puffs.current = puffs.current.filter((p) => frameTime.current - p.time < PUFF_SECONDS)
       const scroll = phaseRef.current === 'playing' && !game.current.dead ? SPEED : phaseRef.current === 'ready' ? SPEED * 0.5 : 0
-      draw(ctx, game.current, head.current, looks.current, distance.current, journey.current, puffs.current, frameTime.current, scroll)
+      draw(ctx, game.current, head.current, looks.current, distance.current, journey.current, puffs.current, frameTime.current, scroll, auto.current)
       animation = requestAnimationFrame(tick)
     }
     animation = requestAnimationFrame(tick)
@@ -479,6 +508,27 @@ export default function FlappyHead() {
     else if (phaseRef.current === 'ready') play()
   }
 
+  // A tap on the stage flaps (or starts it). Three quick ones on the score turn auto flap on or off;
+  // on, it marks this game as played with it. (Australia Mode has the page upside down, so the
+  // tap's flipped.)
+  function tap(e) {
+    e.preventDefault()
+    press()
+    const box = stage.current.getBoundingClientRect()
+    const W = game.current.width
+    let [x, y] = [((e.clientX - box.left) / box.width) * W, ((e.clientY - box.top) / box.height) * HEIGHT]
+    if (document.documentElement.hasAttribute('data-cheat-australia')) [x, y] = [W - x, HEIGHT - y]
+    if (Math.abs(x - W / 2) > SCORE_TAP.halfWidth || y < SCORE_TAP.top || y > SCORE_TAP.bottom) return void (scoreTaps.current = [])
+    const now = performance.now()
+    scoreTaps.current = [...scoreTaps.current.filter((t) => now - t < SCORE_TAP.within), now]
+    if (scoreTaps.current.length < 3) return
+    scoreTaps.current = []
+    auto.current = !auto.current
+    plan.current = null
+    if (auto.current) game.current = { ...game.current, auto: true }
+    feedback(auto.current ? 'bonus' : 'whiff')
+  }
+
   // Space, up arrow or W flap too
   useEffect(() => {
     function key(e) {
@@ -505,7 +555,7 @@ export default function FlappyHead() {
           <GameBar>
             {phase === 'playing' ? <PauseButton onPause={pause} /> : phase !== 'paused' && cog}
           </GameBar>
-          <div className={`game-stage${boardWide ? ' wide' : ''}`} ref={stage} onPointerDown={(e) => (e.preventDefault(), press())}>
+          <div className={`game-stage${boardWide ? ' wide' : ''}`} ref={stage} onPointerDown={tap}>
             <canvas ref={canvas} className="game-canvas" role="img" aria-label={`Flappy Head. Score: ${score}`} />
             {phase === 'ready' && (
               <div className="game-overlay game-overlay-hint">
@@ -519,7 +569,7 @@ export default function FlappyHead() {
                   Score: <strong>{score}</strong>
                   {newBest ? ' · New best!' : best ? ` · Best: ${best}` : ''}
                 </p>
-                <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy} onSaved={setScores} />
+                <ScoreEntry game={GAME} score={score} run={run} easy={game.current?.easy || autoUsed} cheat={autoUsed ? 'Auto flap' : 'Easy mode'} onSaved={setScores} />
                 <button type="button" className="button" onClick={play}>
                   Play again
                 </button>
