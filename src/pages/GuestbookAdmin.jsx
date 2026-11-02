@@ -96,7 +96,6 @@ export default function GuestbookAdmin() {
 
   return (
     <article className="page guestbook-admin">
-      <meta name="robots" content="noindex" />
       <h1 className="page-title">Guestbook</h1>
       {!ready ? (
         <p className="lede">Loading…</p>

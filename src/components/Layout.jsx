@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Analytics } from '@vercel/analytics/react'
 import { contact, nav, socials } from '../content.js'
-import { metaFor, pageTitle } from '../meta.js'
+import { canonical, metaFor, pageTitle } from '../meta.js'
 import { CheatsProvider } from './Cheats.jsx'
 import { PlayerBar, PlayerProvider } from './Player.jsx'
 import ThemeToggle from './ThemeToggle.jsx'
@@ -33,6 +33,10 @@ export default function Layout() {
     const meta = metaFor(pathname)
     document.title = pageTitle(meta)
     document.querySelector('meta[name="description"]')?.setAttribute('content', meta.description)
+    // For search engines that run the page: where it lives, or (an admin page, or not a page at all)
+    // to leave it out
+    head('link', 'rel', 'canonical', meta.noindex ? null : { href: canonical(pathname) })
+    head('meta', 'name', 'robots', meta.noindex ? { content: 'noindex' } : null)
   }, [pathname])
 
   return (
@@ -148,4 +152,16 @@ function NavGroup({ group }) {
       </ul>
     </li>
   )
+}
+
+// Set (or, given null, remove) a tag in the <head>, found by one attribute
+function head(tag, key, value, attributes) {
+  let el = document.head.querySelector(`${tag}[${key}="${value}"]`)
+  if (!attributes) return el?.remove()
+  if (!el) {
+    el = document.createElement(tag)
+    el.setAttribute(key, value)
+    document.head.append(el)
+  }
+  for (const [name, content] of Object.entries(attributes)) el.setAttribute(name, content)
 }

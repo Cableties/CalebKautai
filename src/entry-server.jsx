@@ -4,8 +4,8 @@ import { StaticRouter } from 'react-router-dom'
 import App from './App.jsx'
 
 // Used at build time only (scripts/prerender.mjs) to turn each route into static HTML.
-export { pageMeta } from './content.js'
-export { metaFor, pageTitle } from './meta.js'
+export { notFoundMeta, pageMeta, socials } from './content.js'
+export { SITE, canonical, metaFor, pageTitle } from './meta.js'
 
 export function render(url) {
   return renderToString(

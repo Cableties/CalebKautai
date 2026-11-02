@@ -21,6 +21,24 @@ test('pages arrive prerendered, with content before JavaScript runs', async ({ r
   expect(html).toContain('<title>About | Caleb Kautai</title>')
 })
 
+test('search engines get one address per page, a sitemap, and are kept off the admin page', async ({ page, request }) => {
+  const about = await (await request.get('/about')).text()
+  expect(about).toContain('<link rel="canonical" href="https://www.calebkautai.com/about" />')
+  expect(about).not.toContain('noindex')
+  expect(await (await request.get('/')).text()).toContain('"@type":"Person"')
+  const sitemap = await (await request.get('/sitemap.xml')).text()
+  expect(sitemap).toContain('<loc>https://www.calebkautai.com/games/plink</loc>')
+  expect(sitemap).not.toContain('guestbook-admin')
+  expect(await (await request.get('/robots.txt')).text()).toContain('Sitemap: https://www.calebkautai.com/sitemap.xml')
+  // Moving between pages keeps the tags in step
+  await page.goto('/guestbook-admin')
+  await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex')
+  await expect(page.locator('link[rel="canonical"]')).toHaveCount(0)
+  await page.goto('/about')
+  await page.getByRole('link', { name: 'Caleb Kautai, home' }).click()
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://www.calebkautai.com/')
+})
+
 test('an unknown link shows the not-found page', async ({ page }) => {
   await page.goto('/some/old/wix/link')
   await expect(page).toHaveTitle(pageTitle(notFoundMeta))

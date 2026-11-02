@@ -1,3 +1,10 @@
 {
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "caleb-kautai.vercel.app" }],
+      "destination": "https://www.calebkautai.com/:path*",
+      "permanent": true
+    }
+  ]
 }

@@ -351,6 +351,8 @@ test.describe("Flappy Head", () => {
 	}) => {
 		test.setTimeout(30_000);
 		await page.goto("/games/flappy-head");
+		// Taps before the page has come to life would go nowhere
+		await page.waitForLoadState("networkidle");
 		const stage = page.locator(".game-stage");
 		const box = await stage.boundingBox();
 		// The score's at the top, in the middle

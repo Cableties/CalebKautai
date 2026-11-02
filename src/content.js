@@ -230,7 +230,8 @@ export const thingsToDo = [
 ];
 
 // Title and description for each page: used for the browser tab, search results and link previews.
-// A null title shows the site name on its own.
+// A null title shows the site name on its own. `noindex` keeps a page out of search results and the
+// sitemap.
 export const pageMeta = {
 	"/": {
 		title: null,
@@ -316,11 +317,13 @@ export const pageMeta = {
 	"/cotg-submission": {
 		title: "CoTG",
 		description: "Submissions aren't open yet.",
+		noindex: true,
 	},
 	// Not linked anywhere: opened from guestbook emails (pages/GuestbookAdmin.jsx)
 	"/guestbook-admin": {
 		title: "Guestbook admin",
 		description: "Approve guestbook entries.",
+		noindex: true,
 	},
 	"/decision-wheel": {
 		title: "Decision wheel",
@@ -334,6 +337,7 @@ export const pageMeta = {
 export const notFoundMeta = {
 	title: "Not found",
 	description: "This page doesn't exist.",
+	noindex: true,
 };
 export const SITE_NAME = "Caleb Kautai: The web experience";
 

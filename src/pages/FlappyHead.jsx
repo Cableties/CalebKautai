@@ -513,10 +513,11 @@ export default function FlappyHead() {
   // tap's flipped.)
   function tap(e) {
     e.preventDefault()
-    press()
+    // Where it landed, before a first tap starts the game (and scrolls the stage into view)
     const box = stage.current.getBoundingClientRect()
     const W = game.current.width
     let [x, y] = [((e.clientX - box.left) / box.width) * W, ((e.clientY - box.top) / box.height) * HEIGHT]
+    press()
     if (document.documentElement.hasAttribute('data-cheat-australia')) [x, y] = [W - x, HEIGHT - y]
     if (Math.abs(x - W / 2) > SCORE_TAP.halfWidth || y < SCORE_TAP.top || y > SCORE_TAP.bottom) return void (scoreTaps.current = [])
     const now = performance.now()
