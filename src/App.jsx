@@ -10,6 +10,7 @@ import LoveInterest from './pages/LoveInterest.jsx'
 import Aliens from './pages/Aliens.jsx'
 import CheatCodes from './pages/CheatCodes.jsx'
 import DecisionWheel from './pages/DecisionWheel.jsx'
+import DrawingPad from './pages/DrawingPad.jsx'
 import Bonk from './pages/Bonk.jsx'
 import Bricks from './pages/Bricks.jsx'
 import Bubbles from './pages/Bubbles.jsx'
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="aliens" element={<Aliens />} />
         <Route path="cheat-codes" element={<CheatCodes />} />
         <Route path="decision-wheel" element={<DecisionWheel />} />
+        <Route path="draw" element={<DrawingPad />} />
         <Route path="guestbook-admin" element={<GuestbookAdmin />} />
         <Route path="games" element={<Games />} />
         <Route path="games/flappy-head" element={<FlappyHead />} />

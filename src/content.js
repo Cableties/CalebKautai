@@ -120,6 +120,7 @@ export const nav = [
 			{ to: "/aliens", label: "Aliens!" },
 			{ to: "/cheat-codes", label: "Cheat codes" },
 			{ to: "/decision-wheel", label: "Decision wheel" },
+			{ to: "/draw", label: "Drawing pad" },
 			{ to: "/games", label: "Games" },
 		],
 	},
@@ -211,6 +212,11 @@ export const thingsToDo = [
 		to: "/decision-wheel",
 		label: "Decision wheel",
 		note: "Can't decide? Let the wheel do it. Weighted, obviously.",
+	},
+	{
+		to: "/draw",
+		label: "Drawing pad",
+		note: "Coloured pencils and a big sheet of paper. Save what you make.",
 	},
 	{
 		to: "/games",
@@ -328,6 +334,11 @@ export const pageMeta = {
 	"/decision-wheel": {
 		title: "Decision wheel",
 		description: "Can't decide? Put in the options, weight them, and spin.",
+	},
+	"/draw": {
+		title: "Drawing pad",
+		description:
+			"Draw in your browser with coloured pencils, a marker and a fill bucket, on sketch, lined or grid paper. Save it as a PNG.",
 	},
 	"/cheat-codes": {
 		title: "Cheat codes",
